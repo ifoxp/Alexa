@@ -1,4 +1,11 @@
-pyaudio>=0.2.11
-numpy>=1.21.0
-openwakeword>=0.5.1
-pyinstaller>=5.0.0
+# Wake Word engine
+pvporcupine
+
+# Online Speech-to-Text engine
+SpeechRecognition
+
+# Audio I/O & Data
+pyaudio
+
+# Build tool
+pyinstaller

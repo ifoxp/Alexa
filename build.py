@@ -1,167 +1,79 @@
 import os
 import sys
-import subprocess
 import shutil
-from pathlib import Path
+import subprocess
 
-def install_requirements():
-    """Встановлення необхідних пакетів"""
-    requirements = [
-        "pyaudio",
-        "numpy",
-        "openwakeword",
-        "pyinstaller"
-    ]
+# --- НАЛАШТУВАННЯ БІЛДУ ---
+EXE_NAME = "Alexa"
+MAIN_SCRIPT = "main.py"
+HIDE_CONSOLE = False # False, щоб бачити консоль
+ASSETS_DIR = "assets" # Назва вашої папки з ресурсами
 
-    print("Встановлення залежностей...")
-    for package in requirements:
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-            print(f"[OK] {package} встановлено")
-        except subprocess.CalledProcessError:
-            print(f"[ERROR] Помилка встановлення {package}")
-            return False
-    return True
-
-def create_spec_file():
-    """Створення spec файлу для PyInstaller"""
-    spec_content = '''
-# -*- mode: python ; coding: utf-8 -*-
-
-block_cipher = None
-
-a = Analysis(
-    ['main.py'],
-    pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=[
-        'openwakeword',
-        'openwakeword.model',
-        'wake_word',
-        'pyaudio',
-        'numpy'
-    ],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
-)
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='AlexaWakeWord',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
-'''
-
-    with open('alexa_wakeword.spec', 'w', encoding='utf-8') as f:
-        f.write(spec_content)
-    print("[OK] Spec файл створено")
-
-def build_executable():
-    """Створення виконуваного файлу"""
-    print("Початок збирання exe файлу...")
-
+def find_pvporcupine_resources_path():
     try:
-        # Використання spec файлу для збирання
-        result = subprocess.run([
-            sys.executable, "-m", "PyInstaller",
-            "--clean",
-            "alexa_wakeword.spec"
-        ], capture_output=True, text=True)
-
-        if result.returncode == 0:
-            print("[OK] Exe файл успішно створено!")
-            print("Знайти можна в папці: dist/AlexaWakeWord.exe")
-            return True
-        else:
-            print("[ERROR] Помилка під час збирання:")
-            print(result.stderr)
-            return False
-
+        import pvporcupine
+        package_path = os.path.dirname(pvporcupine.__file__)
+        resources_path = os.path.join(package_path, "lib")
+        if os.path.exists(resources_path):
+            print(f"   > Знайдено ресурси pvporcupine у: {resources_path}")
+            return resources_path
+        return None
     except Exception as e:
-        print(f"[ERROR] Помилка: {e}")
-        return False
+        print(f"❌ Помилка під час пошуку ресурсів pvporcupine: {e}")
+        return None
 
-def cleanup():
-    """Очищення тимчасових файлів"""
-    print("Очищення тимчасових файлів...")
+def build():
+    print("--- Початок збірки проєкту ---")
 
-    dirs_to_remove = ['build', '__pycache__']
-    files_to_remove = ['alexa_wakeword.spec']
+    print("1/4. 🔍 Пошук шляхів до моделей та даних...")
+    pv_resources_path = find_pvporcupine_resources_path()
+    stt_path = "stt"
+    assets_path = ASSETS_DIR
 
-    for dir_name in dirs_to_remove:
-        if os.path.exists(dir_name):
-            shutil.rmtree(dir_name)
-            print(f"Видалено {dir_name}")
+    if not pv_resources_path: sys.exit(1)
+    if not os.path.exists(stt_path):
+        print(f"❌ Помилка: Папка '{stt_path}' не знайдена.")
+        sys.exit(1)
+    if not os.path.exists(assets_path):
+        print(f"⚠️ Попередження: Папка '{assets_path}' не знайдена, звуки не будуть додані.")
 
-    for file_name in files_to_remove:
-        if os.path.exists(file_name):
-            os.remove(file_name)
-            print(f"Видалено {file_name}")
+    print("✅ Шляхи успішно знайдено.")
 
-def main():
-    """Основна функція збирання"""
-    print("Початок збирання Alexa Wake Word в exe...")
-    print("=" * 50)
+    print("2/4. 🛠️  Формування команди PyInstaller...")
+    command = [
+        'pyinstaller',
+        '--onefile',
+        f'--name={EXE_NAME}',
+        f'--add-data={pv_resources_path}{os.pathsep}pvporcupine/lib',
+        f'--add-data={stt_path}{os.pathsep}{stt_path}',
+        f'--add-data={assets_path}{os.pathsep}{assets_path}', # <-- ДОДАНО ПАПКУ ASSETS
+        MAIN_SCRIPT
+    ]
+    if HIDE_CONSOLE:
+        command.append('--noconsole')
+    print(f"   > Команда: {' '.join(command)}")
 
-    # Перевірка наявності основних файлів
-    required_files = ['main.py', 'wake_word.py']
-    for file_name in required_files:
-        if not os.path.exists(file_name):
-            print(f"[ERROR] Файл {file_name} не знайдено!")
-            return False
+    print("\n3/4. 🚀 Запуск процесу збірки...")
+    try:
+        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace') as process:
+            for line in process.stdout:
+                print(line, end='')
+        if process.returncode != 0:
+             raise subprocess.CalledProcessError(process.returncode, command)
+        print("✅ Збірка успішно завершена.")
+    except Exception as e:
+        print(f"\n❌ ПОМИЛКА ПІД ЧАС ЗБІРКИ: {e}")
+        return
 
-    # Встановлення залежностей
-    if not install_requirements():
-        print("[ERROR] Не вдалося встановити залежності")
-        return False
+    print("\n4/4. 🧹 Очищення тимчасових файлів...")
+    try:
+        shutil.rmtree('build', ignore_errors=True)
+        os.remove(f'{EXE_NAME}.spec')
+        print("✅ Тимчасові файли видалено.")
+    except OSError as e:
+        print(f"⚠️ Не вдалося видалити тимчасові файли: {e}")
 
-    # Створення spec файлу
-    create_spec_file()
-
-    # Збирання exe
-    if build_executable():
-        print("\n[SUCCESS] Збирання завершено успішно!")
-        print("Інструкції:")
-        print("   1. Запустіть dist/AlexaWakeWord.exe")
-        print("   2. Скажіть 'Alexa' в мікрофон")
-        print("   3. Програма покаже повідомлення про розпізнавання")
-
-        # Опційне очищення
-        user_input = input("\nВидалити тимчасові файли? (y/n): ")
-        if user_input.lower() in ['y', 'yes', 'так']:
-            cleanup()
-
-        return True
-    else:
-        print("[ERROR] Збирання не вдалося")
-        return False
+    print(f"\n--- 🎉 Готово! Ваш файл '{EXE_NAME}.exe' знаходиться в папці 'dist' ---")
 
 if __name__ == "__main__":
-    success = main()
-    if not success:
-        sys.exit(1)
+    build()

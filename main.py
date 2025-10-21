@@ -1,81 +1,67 @@
+# main.py
 import pyaudio
-import numpy as np
-from openwakeword.model import Model
-import argparse
+import struct
+import pvporcupine
 import time
 from wake_word import WakeWordHandler
+import settings
 
 def main():
-    print("Ініціалізація системи розпізнавання wake word...")
+    if not settings.PICOVOICE_ACCESS_KEY or "ПАСТА_СЮДИ" in settings.PICOVOICE_ACCESS_KEY:
+        print("❌ Помилка: Будь ласка, вставте ваш PICOVOICE_ACCESS_KEY у файл settings.py")
+        return
 
-    # Налаштування аудіо
-    FORMAT = pyaudio.paInt16
-    CHANNELS = 1
-    RATE = 16000
-    CHUNK = 1280  # 80ms chunks at 16kHz
+    print("Ініціалізація системи розпізнавання wake word (Porcupine)...")
 
-    # Ініціалізація моделі openWakeWord з використанням доступних моделей
     try:
-        # Спробуємо використати вбудовану модель "alexa"
-        owwModel = Model(wakeword_models=["alexa"])
-        print("✅ Модель 'alexa' завантажена")
-    except:
-        try:
-            # Якщо alexa недоступна, використаємо hey_jarvis як альтернативу
-            owwModel = Model(wakeword_models=["hey_jarvis"])
-            print("✅ Модель 'hey_jarvis' завантажена (використовуйте 'Hey Jarvis' замість 'Alexa')")
-        except:
-            # Якщо жодна модель недоступна, завантажимо всі доступні
-            owwModel = Model()
-            print("✅ Завантажено всі доступні моделі")
-            print("Доступні wake words:", list(owwModel.models.keys()))
+        porcupine = pvporcupine.create(
+            access_key=settings.PICOVOICE_ACCESS_KEY,
+            keywords=settings.WAKE_WORD_MODELS,
+            sensitivities=[settings.ACTIVATION_THRESHOLD] * len(settings.WAKE_WORD_MODELS)
+        )
+        print(f"✅ Моделі Porcupine {settings.WAKE_WORD_MODELS} завантажені")
+    except Exception as e:
+        print(f"❌ Не вдалося завантажити моделі Porcupine: {e}")
+        return
 
-    # Ініціалізація обробника wake word
+    audio = pyaudio.PyAudio()
+    # Створюємо handler без передачі audio та params, оскільки OnlineTranscriber їх не потребує
     handler = WakeWordHandler()
 
-    # Ініціалізація PyAudio
-    audio = pyaudio.PyAudio()
-
+    stream = None # Initialize stream to None
     try:
-        # Відкриття аудіо потоку
         stream = audio.open(
-            format=FORMAT,
-            channels=CHANNELS,
-            rate=RATE,
+            format=settings.FORMAT,
+            channels=settings.CHANNELS,
+            rate=porcupine.sample_rate,
             input=True,
-            frames_per_buffer=CHUNK
+            frames_per_buffer=porcupine.frame_length
         )
-
-        print(f"🎤 Слухаю wake word(s): {list(owwModel.models.keys())}... (Натисніть Ctrl+C для зупинки)")
+        print(f"🎤 Слухаю wake word(s): {settings.WAKE_WORD_MODELS}... (Натисніть Ctrl+C для зупинки)")
 
         while True:
-            # Читання аудіо даних
-            data = stream.read(CHUNK, exception_on_overflow=False)
-            audio_data = np.frombuffer(data, dtype=np.int16)
+            pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
+            audio_data = struct.unpack_from("h" * porcupine.frame_length, pcm)
+            keyword_index = porcupine.process(audio_data)
 
-            # Обробка через openWakeWord
-            prediction = owwModel.predict(audio_data)
-
-            # Перевірка на активацію wake word
-            for mdl in owwModel.prediction_buffer.keys():
-                scores = list(owwModel.prediction_buffer[mdl])
-                if scores:
-                    current_score = scores[-1]
-                    if current_score > 0.7:  # Підвищений поріг активації
-                        handler.on_wake_word_detected(mdl, current_score)
+            if keyword_index >= 0:
+                detected_keyword = settings.WAKE_WORD_MODELS[keyword_index]
+                # У цьому простому варіанті ми не зупиняємо потік Porcupine,
+                # бо OnlineTranscriber відкриє свій власний потік.
+                handler.on_wake_word_detected(detected_keyword)
 
     except KeyboardInterrupt:
         print("\n⏹️ Зупинка програми...")
-
     except Exception as e:
         print(f"❌ Помилка: {e}")
-
     finally:
-        # Закриття ресурсів
-        if 'stream' in locals():
+        if 'porcupine' in locals():
+            porcupine.delete()
+        if stream is not None and stream.is_active():
             stream.stop_stream()
             stream.close()
-        audio.terminate()
+        if 'audio' in locals():
+            audio.terminate()
         print("✅ Програма завершена")
 
 if __name__ == "__main__":
