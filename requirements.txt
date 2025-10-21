@@ -11,14 +11,14 @@ pyaudio
 thefuzz
 python-Levenshtein
 
-# System Control (e.g., volume)
+# System Control (volume & media)
 pycaw
+pywin32
+keyboard # <-- ДОДАНО
 
 # System Tray integration
 pystray
 Pillow
-
-# Audio playback (built-in)
 
 # Build tool
 pyinstaller

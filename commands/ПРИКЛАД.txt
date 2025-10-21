@@ -1,0 +1,156 @@
+1. Проста команда: Відкрити сайт
+
+Це найпростіший тип команди. Вона має одну дію і не потребує додаткових аргументів.
+
+commands/open_google_command.json
+
+JSON
+
+{
+    "name": "open_google",
+    "phrases": [
+        "відкрий гугл",
+        "запусти гугл",
+        "открой google"
+    ],
+    "type": "website",
+    "target": "https://www.google.com",
+    "requires_argument": false
+}
+
+Як працює: Коли ви кажете "Алекса, відкрий гугл", find_command знаходить найкращий збіг і викликає ActionExecutor.open_website з URL https://www.google.com.
+
+2. Команда з аргументом: Пошук в інтернеті
+
+Цей тип команди "слухає" фразу-тригер, а все, що сказано після неї, вважається аргументом.
+
+commands/search_google_command.json
+
+JSON
+
+{
+    "name": "search_google",
+    "phrases": [
+        "знайди в гуглі",
+        "пошук в гугл",
+        "найди в гугле"
+    ],
+    "type": "website",
+    "target": "https://www.google.com/search?q=",
+    "requires_argument": true
+}
+
+Як працює: Ви кажете "Алекса, знайди в гуглі погода у Вінниці".
+
+    find_command бачить, що фраза починається з "знайди в гуглі".
+
+    Він визначає аргумент як "погода у Вінниці".
+
+    Викликається ActionExecutor.open_website з url="https://www.google.com/search?q=" та argument="погода у Вінниці".
+
+    Результат: відкривається браузер зі сторінкою пошуку.
+
+3. Команда запуску додатку
+
+Ця команда відкриває будь-яку програму на вашому комп'ютері. Важливо: шлях у target має бути правильним і використовувати подвійні слеші (\\).
+
+commands/open_vscode_command.json
+
+JSON
+
+{
+    "name": "open_vscode",
+    "phrases": [
+        "відкрий Visual Studio Code",
+        "запусти код",
+        "открой код"
+    ],
+    "type": "application",
+    "target": "C:\\Users\\ifoxp\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+    "requires_argument": false
+}
+
+Як працює: При збігу фрази викликається ActionExecutor.run_application зі вказаним шляхом, і програма запускається.
+
+4. Команда керування системою (з аргументом)
+
+Приклад з керуванням гучністю, який ми вже обговорювали.
+
+commands/set_volume_command.json
+
+JSON
+
+{
+    "name": "set_volume",
+    "phrases": [
+        "звук на",
+        "гучність на",
+        "volume at"
+    ],
+    "type": "system_volume",
+    "target": null,
+    "requires_argument": true
+}
+
+Як працює: Ви кажете "Алекса, звук на 75".
+
+    find_command знаходить команду set_volume та аргумент "75".
+
+    Викликається ActionExecutor.set_system_volume, який витягує число 75 з аргументу і встановлює відповідний рівень гучності.
+
+5. Команда запуску скрипту (без вікна)
+
+Ця команда ідеально підходить для автоматизації рутинних завдань, наприклад, створення резервної копії.
+
+commands/run_backup_command.json
+
+JSON
+
+{
+    "name": "run_backup",
+    "phrases": [
+        "запусти резервне копіювання",
+        "зроби бекап"
+    ],
+    "type": "script",
+    "target": "C:\\Users\\ifoxp\\Documents\\scripts\\backup.bat",
+    "requires_argument": false
+}
+
+Як працює: При збігу фрази викликається ActionExecutor.run_script. Важливо, що він запускає скрипт без створення чорного вікна консолі, що робить його роботу непомітною.
+
+6. Складна команда (кілька дій)
+
+Це найпотужніший тип команди, який ви просили. Використовує ключ "actions" (список дій) замість "type" та "target".
+
+commands/workspace_command.json
+
+JSON
+
+{
+    "name": "prepare_workspace",
+    "phrases": [
+        "підготуй робоче місце",
+        "почати роботу",
+        "режим роботи"
+    ],
+    "actions": [
+        {
+            "type": "application",
+            "target": "C:\\Users\\ifoxp\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+        },
+        {
+            "type": "application",
+            "target": "C:\\Program Files (x86)\\Steam\\Steam.exe"
+        },
+        {
+            "type": "website",
+            "target": "https://github.com/"
+        },
+        {
+            "type": "system_volume",
+            "target": null
+        }
+    ],
+    "requires_argument": false
+}

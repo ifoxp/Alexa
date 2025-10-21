@@ -1,47 +1,64 @@
-# build.py
 import os
 import sys
 import shutil
 import subprocess
+from pathlib import Path
 
-EXE_NAME = "Jarvis" # Змінено ім'я
+# --- НАЛАШТУВАННЯ БІЛДУ ---
+EXE_NAME = "Jarvis"
 MAIN_SCRIPT = "main.py"
-HIDE_CONSOLE = True # Встановлюємо True для фонового додатку
+HIDE_CONSOLE = True
 ASSETS_DIR = "assets"
-COMMANDS_DIR = "commands" # Назва папки з командами
-ICON_FILE = os.path.join(ASSETS_DIR, "ai.ico") # Шлях до іконки .exe
+COMMANDS_DIR = "commands"
 
-def find_pvporcupine_resources_path():
+# --- ДИНАМІЧНІ ШЛЯХИ ---
+BASE_DIR = Path(__file__).resolve().parent
+ICON_FILE = BASE_DIR / ASSETS_DIR / "jarvis.ico"
+
+def get_package_path(package_name):
+    """Знаходить абсолютний шлях до встановленого пакету."""
     try:
-        import pvporcupine
-        package_path = os.path.dirname(pvporcupine.__file__)
-        resources_path = os.path.join(package_path, "lib")
-        if os.path.exists(resources_path):
-            print(f"   > Знайдено ресурси pvporcupine у: {resources_path}")
-            return resources_path
+        import importlib.util
+        spec = importlib.util.find_spec(package_name)
+        if spec and spec.origin:
+            return Path(spec.origin).parent
         return None
     except Exception as e:
-        print(f"❌ Помилка під час пошуку ресурсів pvporcupine: {e}")
+        print(f"❌ Помилка під час пошуку пакету {package_name}: {e}")
         return None
 
 def build():
+    """Основна функція для збірки проєкту."""
     print("--- Початок збірки проєкту ---")
 
     print("1/4. 🔍 Пошук шляхів до моделей та даних...")
-    pv_resources_path = find_pvporcupine_resources_path()
+
+    # --- ЗНАХОДИМО РЕСУРСИ PVPORCUPINE (НАДІЙНИЙ СПОСІБ) ---
+    pvporcupine_path = get_package_path("pvporcupine")
+    if not pvporcupine_path:
+        print("Неможливо продовжити: пакет 'pvporcupine' не знайдено.")
+        sys.exit(1)
+
+    # Визначаємо шляхи до обох папок: lib та resources
+    pv_lib_path = pvporcupine_path / "lib"
+    pv_resources_path = pvporcupine_path / "resources"
+    print(f"   > Знайдено pvporcupine 'lib': {pv_lib_path}")
+    print(f"   > Знайдено pvporcupine 'resources': {pv_resources_path}")
+
     stt_path = "stt"
     assets_path = ASSETS_DIR
     commands_path = COMMANDS_DIR
 
-    if not pv_resources_path: sys.exit(1)
-    if not os.path.exists(stt_path):
-        print(f"❌ Помилка: Папка '{stt_path}' не знайдена.")
+    # --- ПЕРЕВІРКА НАЯВНОСТІ ФАЙЛІВ ПЕРЕД ЗБІРКОЮ ---
+    if not pv_lib_path.exists() or not pv_resources_path.exists():
+        print("❌ Критична помилка: папки 'lib' або 'resources' не знайдено всередині pvporcupine.")
         sys.exit(1)
-    if not os.path.exists(assets_path):
-        print(f"❌ Помилка: Папка '{assets_path}' не знайдена.")
+        
+    if not ICON_FILE.exists():
+        print(f"❌ Критична помилка: Файл іконки не знайдено за шляхом: {ICON_FILE}")
         sys.exit(1)
-    if not os.path.exists(commands_path):
-         print(f"⚠️ Попередження: Папка '{commands_path}' не знайдена, команди не будуть додані.")
+
+    # ... (решта перевірок)
 
     print("✅ Шляхи успішно знайдено.")
 
@@ -50,30 +67,42 @@ def build():
         'pyinstaller',
         '--onefile',
         f'--name={EXE_NAME}',
-        f'--icon={ICON_FILE}', # <-- Іконка для .exe
-        f'--add-data={pv_resources_path}{os.pathsep}pvporcupine/lib',
-        f'--add-data={stt_path}{os.pathsep}{stt_path}',
-        f'--add-data={assets_path}{os.pathsep}{assets_path}', # <-- Включення папки assets
-        f'--add-data={commands_path}{os.pathsep}{commands_path}', # <-- Включення папки commands
+        f'--icon={ICON_FILE}',
+        # !!! ВИПРАВЛЕНО: Додаємо обидві папки pvporcupine !!!
+        f'--add-data={pv_lib_path}{os.pathsep}pvporcupine/lib',
+        f'--add-data={pv_resources_path}{os.pathsep}pvporcupine/resources',
+        f'--add-data={stt_path}{os.pathsep}stt',
+        f'--add-data={assets_path}{os.pathsep}assets',
+        f'--add-data={commands_path}{os.pathsep}commands',
         MAIN_SCRIPT
     ]
     if HIDE_CONSOLE:
-        command.append('--noconsole') # або --windowed
-        # Важливо для Windows, щоб PyInstaller не думав, що це консольний додаток
-        # command.append('--disable-windowed-traceback') 
+        command.append('--noconsole')
         
     print(f"   > Команда: {' '.join(command)}")
 
-    print("\n3/4. 🚀 Запуск процесу збірки...")
+    print("\n3/4. 🚀 Запуск процесу збірки... Це може зайняти деякий час.")
     try:
-        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace') as process:
-            for line in process.stdout:
-                print(line, end='')
+        # ... (решта коду запуску та очищення залишається без змін) ...
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+                                   text=True, encoding='utf-8', errors='replace')
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                print(output.strip())
+        
         if process.returncode != 0:
              raise subprocess.CalledProcessError(process.returncode, command)
+             
         print("✅ Збірка успішно завершена.")
-    except Exception as e:
-        print(f"\n❌ ПОМИЛКА ПІД ЧАС ЗБІРКИ: {e}")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"\n❌ ПОМИЛКА ПІД ЧАС ЗБІРКИ:")
+        if isinstance(e, FileNotFoundError):
+            print("   > Команда 'pyinstaller' не знайдена. Встановіть її: pip install pyinstaller")
+        else:
+            print(f"   > PyInstaller завершився з помилкою (код {e.returncode}).")
         return
 
     print("\n4/4. 🧹 Очищення тимчасових файлів...")

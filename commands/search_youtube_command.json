@@ -1,0 +1,7 @@
+{
+    "name": "search_youtube",
+    "phrases": ["напиши на youtube", "найди на youtube", "найди в youtube"],
+    "type": "website",
+    "target": "https://www.youtube.com/results?search_query=",
+    "requires_argument": true
+}

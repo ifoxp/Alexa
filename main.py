@@ -1,4 +1,3 @@
-# main.py
 import time
 import struct
 import pyaudio
@@ -7,32 +6,49 @@ import threading
 from wake_word import WakeWordHandler
 from tray_manager import TrayManager
 import config_manager as cfg
-import settings # Для аудіо параметрів
+import settings
 
-# --- Глобальні змінні ---
-porcupine = None
-stream = None
-audio = None
-config = {} # Словник для завантаженої конфігурації
+def listen_loop(tray_manager, handler, porcupine, stream, config):
+    """Основний цикл, що виконується в окремому потоці."""
+    print(f"🎤 Слухаю '{config['wakeWordStandard']}'...")
+    while tray_manager.is_running:
+        try:
+            pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
+            audio_data = struct.unpack_from("h" * porcupine.frame_length, pcm)
+            keyword_index = porcupine.process(audio_data)
 
-def main_loop(tray_manager):
-    """Основний цикл, що слухає wake word."""
-    global stream, porcupine, config
-    
-    # Використовуємо AccessKey та інші параметри з config
+            if keyword_index >= 0:
+                handler.on_wake_word_detected(config["wakeWordStandard"])
+
+        except (IOError, OSError) as e:
+            if tray_manager.is_running:
+                print(f"⚠️ Помилка читання аудіо: {e}. Спробуємо продовжити.")
+            time.sleep(1)
+        except Exception as e:
+            if tray_manager.is_running:
+                print(f"❌ Неочікувана помилка в циклі слухання: {e}")
+            break
+
+def main():
+    """Головна функція: ініціалізація та очищення."""
+    config = None
+    tray = None
+    porcupine = None
+    audio = None
+    stream = None
+
     try:
+        config = cfg.load_config()
+        tray = TrayManager("Jarvis Assistant")
+        handler = WakeWordHandler(tray)
+        
         porcupine = pvporcupine.create(
             access_key=config["picovoiceAccessKey"],
-            keywords=[config["wakeWordStandard"]], # Використовуємо одне слово з конфігу
+            keywords=[config["wakeWordStandard"]],
             sensitivities=[config["sensitivity"]]
         )
         print(f"✅ Модель Porcupine '{config['wakeWordStandard']}' завантажена")
 
-        handler = WakeWordHandler(tray_manager) # Передаємо tray_manager
-        
-        # Використовуємо налаштування мови з конфігу
-        handler.transcriber.set_language(config["language"])
-        
         audio = pyaudio.PyAudio()
         stream = audio.open(
             format=settings.FORMAT,
@@ -41,54 +57,31 @@ def main_loop(tray_manager):
             input=True,
             frames_per_buffer=porcupine.frame_length
         )
-        print(f"🎤 Слухаю '{config['wakeWordStandard']}'...")
 
-        while tray_manager.is_running:
-            try:
-                pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
-                audio_data = struct.unpack_from("h" * porcupine.frame_length, pcm)
-                keyword_index = porcupine.process(audio_data)
+        listen_thread = threading.Thread(
+            target=listen_loop,
+            args=(tray, handler, porcupine, stream, config),
+            daemon=True
+        )
+        listen_thread.start()
 
-                if keyword_index >= 0: # Wake word виявлено
-                    handler.on_wake_word_detected(config["wakeWordStandard"])
+        print("✅ Асистент запущено у фоновому режимі.")
+        tray.start()
 
-            except (IOError, struct.error, OSError) as e:
-                # Ігноруємо помилки читання потоку, які можуть виникнути при закритті
-                if tray_manager.is_running:
-                     print(f"Помилка читання аудіо потоку: {e}")
-                time.sleep(0.1) # Невелика пауза
-                continue
-            except Exception as e:
-                 print(f"❌ Неочікувана помилка в основному циклі: {e}")
-                 break # Виходимо з циклу при серйозних помилках
-
-    except pvporcupine.PorcupineActivationLimitError:
-         print("ПОМИЛКА: Досягнуто ліміт активацій Picovoice для цього AccessKey.")
-         # Тут можна показати повідомлення користувачу через трей
     except Exception as e:
-        print(f"❌ Критична помилка ініціалізації/роботи Porcupine: {e}")
+        print(f"❌ Критична помилка під час запуску: {e}")
     finally:
-        print("Зупинка основного циклу...")
-        if porcupine: porcupine.delete()
+        print("\n--- Завершення роботи та очищення ресурсів ---")
+        if tray:
+            tray.stop()
+        if porcupine:
+            porcupine.delete()
         if stream:
             stream.stop_stream()
             stream.close()
-        if audio: audio.terminate()
-        # Сигналізуємо трею, що основний цикл завершено (якщо він ще працює)
-        if tray_manager.is_running:
-            tray_manager.stop() # Це зупинить іконку
+        if audio:
+            audio.terminate()
+        print("✅ Програма завершена.")
 
 if __name__ == "__main__":
-    try:
-        config = cfg.load_config() # Завантажуємо конфіг перед запуском
-    except (FileNotFoundError, ValueError) as e:
-         print(f"Не вдалося завантажити конфігурацію: {e}")
-         # Тут можна показати вікно помилки, якщо це .exe без консолі
-         exit() # Виходимо, якщо немає конфігу або ключа
-
-    tray = TrayManager("Jarvis Assistant")
-    # Передаємо функцію main_loop, яка буде запущена в окремому потоці
-    tray.start(main_loop) 
-    # Головний потік тепер заблокований викликом tray.start() (точніше, icon.run())
-    # і чекатиме, доки користувач не натисне "Вихід"
-    print("Програма завершена.") # Цей рядок виконається після закриття трею
+    main()

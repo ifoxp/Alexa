@@ -1,7 +1,8 @@
 {
   "picovoiceAccessKey": "CeVnRNJScYlhq2hbOKtZCrZI7eUxWZKRIi8AaUQ2AHN+j+XF7Nt4nQ==",
-  "wakeWordModel": "porcupine",
-  "customWakeWordPath": null,
+  "wakeWordStandard": "alexa",
   "sensitivity": 0.5,
-  "language": "uk-UA"
+  "language": "uk-UA",
+  "wakeWordModel": "porcupine",
+  "customWakeWordPath": null
 }

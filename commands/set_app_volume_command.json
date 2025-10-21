@@ -1,0 +1,11 @@
+{
+    "name": "set_app_volume",
+    "phrases": [
+        "звук додатка на",
+        "гучність додатка на",
+        "звук приложения на"
+    ],
+    "type": "app_volume",
+    "target": null,
+    "requires_argument": true
+}

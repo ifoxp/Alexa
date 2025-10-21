@@ -1,7 +1,11 @@
 {
-    "name": "search_youtube",
-    "phrases": ["знайди на ютубі", "найди на youtube", "найди в youtube"],
-    "type": "website",
-    "target": "https://www.youtube.com/results?search_query=",
+    "name": "set_volume",
+    "phrases": [
+        "звук на",
+        "гучність на",
+        "volume at"
+    ],
+    "type": "system_volume",
+    "target": null,
     "requires_argument": true
 }

@@ -1,9 +1,9 @@
-# settings.py
 import pyaudio
+import os
 
-# --- Налаштування Обробки Команд (залишаються тут) ---
+# --- Налаштування Обробки Команд ---
 COMMAND_SESSION_TIMEOUT = 15
-CONTINUOUS_LISTEN_SECONDS = 5
+CONTINUOUS_LISTEN_SECONDS = 7
 SILENCE_DETECT_SECONDS = 1.5
 
 # --- Аудіо Налаштування (незмінні) ---
