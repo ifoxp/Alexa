@@ -7,5 +7,18 @@ SpeechRecognition
 # Audio I/O & Data
 pyaudio
 
+# Command matching
+thefuzz
+python-Levenshtein
+
+# System Control (e.g., volume)
+pycaw
+
+# System Tray integration
+pystray
+Pillow
+
+# Audio playback (built-in)
+
 # Build tool
 pyinstaller

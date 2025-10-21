@@ -1,13 +1,15 @@
+# build.py
 import os
 import sys
 import shutil
 import subprocess
 
-# --- НАЛАШТУВАННЯ БІЛДУ ---
-EXE_NAME = "Alexa"
+EXE_NAME = "Jarvis" # Змінено ім'я
 MAIN_SCRIPT = "main.py"
-HIDE_CONSOLE = False # False, щоб бачити консоль
-ASSETS_DIR = "assets" # Назва вашої папки з ресурсами
+HIDE_CONSOLE = True # Встановлюємо True для фонового додатку
+ASSETS_DIR = "assets"
+COMMANDS_DIR = "commands" # Назва папки з командами
+ICON_FILE = os.path.join(ASSETS_DIR, "ai.ico") # Шлях до іконки .exe
 
 def find_pvporcupine_resources_path():
     try:
@@ -29,13 +31,17 @@ def build():
     pv_resources_path = find_pvporcupine_resources_path()
     stt_path = "stt"
     assets_path = ASSETS_DIR
+    commands_path = COMMANDS_DIR
 
     if not pv_resources_path: sys.exit(1)
     if not os.path.exists(stt_path):
         print(f"❌ Помилка: Папка '{stt_path}' не знайдена.")
         sys.exit(1)
     if not os.path.exists(assets_path):
-        print(f"⚠️ Попередження: Папка '{assets_path}' не знайдена, звуки не будуть додані.")
+        print(f"❌ Помилка: Папка '{assets_path}' не знайдена.")
+        sys.exit(1)
+    if not os.path.exists(commands_path):
+         print(f"⚠️ Попередження: Папка '{commands_path}' не знайдена, команди не будуть додані.")
 
     print("✅ Шляхи успішно знайдено.")
 
@@ -44,13 +50,18 @@ def build():
         'pyinstaller',
         '--onefile',
         f'--name={EXE_NAME}',
+        f'--icon={ICON_FILE}', # <-- Іконка для .exe
         f'--add-data={pv_resources_path}{os.pathsep}pvporcupine/lib',
         f'--add-data={stt_path}{os.pathsep}{stt_path}',
-        f'--add-data={assets_path}{os.pathsep}{assets_path}', # <-- ДОДАНО ПАПКУ ASSETS
+        f'--add-data={assets_path}{os.pathsep}{assets_path}', # <-- Включення папки assets
+        f'--add-data={commands_path}{os.pathsep}{commands_path}', # <-- Включення папки commands
         MAIN_SCRIPT
     ]
     if HIDE_CONSOLE:
-        command.append('--noconsole')
+        command.append('--noconsole') # або --windowed
+        # Важливо для Windows, щоб PyInstaller не думав, що це консольний додаток
+        # command.append('--disable-windowed-traceback') 
+        
     print(f"   > Команда: {' '.join(command)}")
 
     print("\n3/4. 🚀 Запуск процесу збірки...")
@@ -74,6 +85,8 @@ def build():
         print(f"⚠️ Не вдалося видалити тимчасові файли: {e}")
 
     print(f"\n--- 🎉 Готово! Ваш файл '{EXE_NAME}.exe' знаходиться в папці 'dist' ---")
+    print(f"--- Не забудьте покласти файл 'config.json' поруч з '{EXE_NAME}.exe' ---")
+
 
 if __name__ == "__main__":
     build()
