@@ -3,6 +3,9 @@
   "wakeWordStandard": "alexa",
   "sensitivity": 0.5,
   "language": "uk-UA",
-  "wakeWordModel": "porcupine",
-  "customWakeWordPath": null
+  "wakeWordMode": "custom",
+  "customWakeWordPath": "E:\\Programing\\Phyton\\Alexa\\dist\\Alex_en_windows_v3_0_0.ppn",
+  "commandSessionTimeout": 15,
+  "continuousListenSeconds": 7,
+  "silenceDetectSeconds": 1.5
 }

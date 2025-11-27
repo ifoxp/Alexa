@@ -37,7 +37,7 @@ class TrayManager:
         print("Запуск налаштувань...")
         try:
             base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else "."
-            settings_exe_path = os.path.join(base_path, "Configurator.exe")
+            settings_exe_path = os.path.join(base_path, "AlexaSettingsApp.exe")
             if os.path.exists(settings_exe_path):
                 os.startfile(settings_exe_path)
             else:

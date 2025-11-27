@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 # --- НАЛАШТУВАННЯ БІЛДУ ---
-EXE_NAME = "Jarvis"
+EXE_NAME = "Alexa"
 MAIN_SCRIPT = "main.py"
 HIDE_CONSOLE = True
 ASSETS_DIR = "assets"
