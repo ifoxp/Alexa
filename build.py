@@ -27,11 +27,55 @@ def get_package_path(package_name):
         print(f"❌ Помилка під час пошуку пакету {package_name}: {e}")
         return None
 
+def copy_csharp_settings_app():
+    """Копіює C# додаток налаштувань та його залежності в dist папку."""
+    print("Копіювання C# налаштувань...")
+
+    csharp_bin_dir = BASE_DIR / "AlexaS" / "AlexaS" / "bin" / "Release"
+    csharp_exe = csharp_bin_dir / "AlexaS.exe"
+    dist_dir = BASE_DIR / "dist"
+    target_exe = dist_dir / "AlexaSettingsApp.exe"
+
+    if not csharp_exe.exists():
+        print(f"УВАГА: C# EXE не знайдено за шляхом: {csharp_exe}")
+        print("   Спочатку збудуйте C# проект в Release режимі через Visual Studio")
+        return False
+
+    # Створюємо dist папку якщо не існує
+    dist_dir.mkdir(exist_ok=True)
+
+    # Копіюємо основний EXE
+    shutil.copy2(csharp_exe, target_exe)
+    print(f"OK: C# EXE скопійовано: {target_exe.name}")
+
+    # Копіюємо всі DLL залежності
+    dll_files = list(csharp_bin_dir.glob("*.dll"))
+    copied_dlls = []
+
+    for dll_file in dll_files:
+        target_dll = dist_dir / dll_file.name
+        shutil.copy2(dll_file, target_dll)
+        copied_dlls.append(dll_file.name)
+
+    if copied_dlls:
+        print(f"OK: Скопійовано {len(copied_dlls)} DLL залежностей:")
+        for dll in copied_dlls:
+            print(f"   - {dll}")
+
+    # Копіюємо config файл якщо є
+    config_file = csharp_bin_dir / "AlexaS.exe.config"
+    if config_file.exists():
+        target_config = dist_dir / "AlexaSettingsApp.exe.config"
+        shutil.copy2(config_file, target_config)
+        print(f"OK: Config скопійовано: {target_config.name}")
+
+    return True
+
 def build():
     """Основна функція для збірки проєкту."""
     print("--- Початок збірки проєкту ---")
 
-    print("1/4. 🔍 Пошук шляхів до моделей та даних...")
+    print("1/5. 🔍 Пошук шляхів до моделей та даних...")
 
     # --- ЗНАХОДИМО РЕСУРСИ PVPORCUPINE (НАДІЙНИЙ СПОСІБ) ---
     pvporcupine_path = get_package_path("pvporcupine")
@@ -62,7 +106,7 @@ def build():
 
     print("✅ Шляхи успішно знайдено.")
 
-    print("2/4. 🛠️  Формування команди PyInstaller...")
+    print("2/5. 🛠️  Формування команди PyInstaller...")
     command = [
         'pyinstaller',
         '--onefile',
@@ -81,7 +125,7 @@ def build():
         
     print(f"   > Команда: {' '.join(command)}")
 
-    print("\n3/4. 🚀 Запуск процесу збірки... Це може зайняти деякий час.")
+    print("\n3/5. 🚀 Запуск процесу збірки... Це може зайняти деякий час.")
     try:
         # ... (решта коду запуску та очищення залишається без змін) ...
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
@@ -105,7 +149,10 @@ def build():
             print(f"   > PyInstaller завершився з помилкою (код {e.returncode}).")
         return
 
-    print("\n4/4. 🧹 Очищення тимчасових файлів...")
+    print("\n4/5. Копіювання C# додатку налаштувань...")
+    copy_csharp_settings_app()
+
+    print("\n5/5. 🧹 Очищення тимчасових файлів...")
     try:
         shutil.rmtree('build', ignore_errors=True)
         os.remove(f'{EXE_NAME}.spec')
@@ -113,9 +160,19 @@ def build():
     except OSError as e:
         print(f"⚠️ Не вдалося видалити тимчасові файли: {e}")
 
-    print(f"\n--- 🎉 Готово! Ваш файл '{EXE_NAME}.exe' знаходиться в папці 'dist' ---")
-    print(f"--- Не забудьте покласти файл 'config.json' поруч з '{EXE_NAME}.exe' ---")
+    print(f"\n--- Готово! ---")
+    print(f"Основний додаток: dist/{EXE_NAME}.exe")
+    print(f"Налаштування: dist/AlexaSettingsApp.exe")
+    print(f"--- Не забудьте покласти файл 'config.json' в папку 'dist' ---")
 
 
 if __name__ == "__main__":
-    build()
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--copy-csharp-only":
+        # Тільки копіювання C# додатку без Python білду
+        print("--- Копіювання тільки C# додатку ---")
+        copy_csharp_settings_app()
+    else:
+        # Повний білд
+        build()
