@@ -226,3 +226,5 @@ AlexaS/packages/
 # Visual Studio cache/options directory
 .vs/
 config.json
+/config.json
+.config.json

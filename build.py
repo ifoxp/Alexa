@@ -70,7 +70,39 @@ def copy_csharp_settings_app():
         print(f"OK: Config скопійовано: {target_config.name}")
 
     return True
+def copy_assets_folder():
+    """Копіює папку assets з усім вмістом поруч з EXE."""
+    print("Копіювання папки assets...")
 
+    assets_source = BASE_DIR / "assets"
+    dist_dir = BASE_DIR / "dist"
+    assets_target = dist_dir / "assets"
+
+    # 1. Перевіряємо, чи існує вихідна папка
+    if not assets_source.exists():
+        print(f"УВАГА: Папка assets не знайдена: {assets_source}")
+        return False
+
+    # 2. Створюємо dist папку, якщо вона ще не існує
+    dist_dir.mkdir(exist_ok=True)
+
+    # 3. Видаляємо стару папку assets у dist, щоб уникнути конфліктів при перекопіюванні
+    if assets_target.exists():
+        shutil.rmtree(assets_target)
+
+    try:
+        # 4. Копіюємо всю структуру папок та файлів
+        shutil.copytree(assets_source, assets_target)
+        
+        # Рахуємо кількість скопійованих файлів для звіту
+        all_files = list(assets_target.rglob("*"))
+        files_only = [f for f in all_files if f.is_file()]
+        
+        print(f"OK: Скопійовано папку assets ({len(files_only)} файлів успішно перенесено)")
+        return True
+    except Exception as e:
+        print(f"ПОМИЛКА при копіюванні assets: {e}")
+        return False
 def copy_plugins_folder():
     """Копіює папку plugins поруч з EXE для користувачів."""
     print("Копіювання папки plugins...")
@@ -101,6 +133,32 @@ def copy_plugins_folder():
 
     return True
 
+def copy_config_file():
+    """Копіює файл config.json поруч з EXE у папку dist."""
+    print("Копіювання конфігураційного файлу...")
+
+    config_source = BASE_DIR / "config.json"
+    dist_dir = BASE_DIR / "dist"
+    config_target = dist_dir / "config.json"
+
+    # 1. Перевіряємо, чи існує вихідний файл
+    if not config_source.exists():
+        print(f"УВАГА: Файл конфігурації не знайдений: {config_source}")
+        # Для диплома можна додати створення дефолтного конфігу, якщо його немає
+        return False
+
+    # 2. Створюємо dist папку, якщо вона ще не існує
+    dist_dir.mkdir(exist_ok=True)
+
+    try:
+        # 3. Копіюємо файл (shutil.copy2 зберігає метадані файлу)
+        shutil.copy2(config_source, config_target)
+        print(f"OK: Файл {config_source.name} успішно скопійовано до {dist_dir.name}")
+        return True
+    except Exception as e:
+        print(f"ПОМИЛКА при копіюванні конфігурації: {e}")
+        return False
+    
 def build():
     """Основна функція для збірки проєкту."""
     print("--- Початок збірки проєкту ---")
@@ -182,7 +240,8 @@ def build():
 
     print("\n5/6. Копіювання папки plugins...")
     copy_plugins_folder()
-
+    copy_config_file()
+    copy_assets_folder()
     print("\n6/6. Очищення тимчасових файлів...")
     try:
         shutil.rmtree('build', ignore_errors=True)
