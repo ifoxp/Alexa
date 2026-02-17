@@ -225,3 +225,4 @@ AlexaS/packages/
 .claude/
 # Visual Studio cache/options directory
 .vs/
+config.json
