@@ -4,21 +4,32 @@ pvporcupine
 # Online Speech-to-Text engine
 SpeechRecognition
 
+# Async support
+asyncio
+
+# Retry mechanism
+tenacity
+
+# AI Assistant (GPT-5 nano)
+openai
+
+# System monitoring
+psutil
+
 # Audio I/O & Data
 pyaudio
 
-# Command matching
+# Command matching (python-Levenshtein автоматично встановлюється)
 thefuzz
-python-Levenshtein
 
 # System Control (volume & media)
 pycaw
 pywin32
-keyboard # <-- ДОДАНО
+keyboard
 
 # System Tray integration
 pystray
 Pillow
 
-# Build tool
+# Build tool (тільки для розробки)
 pyinstaller

@@ -28,28 +28,32 @@ class MediaStateManager:
 
     def pause_if_playing(self):
         """
-        Знаходить активні аудіо-сесії. Якщо вони є,
+        Знаходить активні аудіо-сесії. Якщо вони відтворюють звук,
         надсилає сигнал Play/Pause і запам'ятовує процеси.
+        Не робить нічого якщо музика вже на паузі.
         """
         self.paused_by_assistant.clear() # Очищуємо перед новою операцією
-        
-        found_audible_session = False
+
+        found_playing_session = False
         try:
             sessions = AudioUtilities.GetAllSessions()
             for session in sessions:
                 if session.Process and self._is_session_audible(session):
-                    # Запам'ятовуємо ім'я процесу
+                    # Запам'ятовуємо ім'я процесу тільки якщо він реально відтворює
                     self.paused_by_assistant.add(session.Process.name())
-                    found_audible_session = True
-            
-            if found_audible_session:
-                print("[MEDIA] Знайдено активне відтворення. Надсилаю сигнал Play/Pause...")
+                    found_playing_session = True
+
+            if found_playing_session:
+                print("[MEDIA] Знайдено активне відтворення. Ставлю на паузу...")
                 keyboard.press_and_release('play/pause')
+                return True  # Повертаємо True якщо щось поставили на паузу
             else:
-                print("[MEDIA] Активного відтворення не знайдено. Нічого не роблю.")
+                print("[MEDIA] Активного відтворення не знайдено. Залишаю як є.")
+                return False  # Повертаємо False якщо нічого не змінили
 
         except Exception as e:
-            print(f"❌ Помилка при спробі поставити медіа на паузу: {e}")
+            print(f"Помилка при спробі поставити медіа на паузу: {e}")
+            return False
 
     def resume_if_paused(self):
         """
@@ -57,6 +61,7 @@ class MediaStateManager:
         надсилає сигнал Play/Pause для відновлення.
         """
         if not self.paused_by_assistant:
+            print("[MEDIA] Нема процесів для відновлення.")
             return
 
         print("[MEDIA] Відновлення відтворення для раніше зупинених процесів...")
@@ -68,14 +73,15 @@ class MediaStateManager:
                 if session.Process and session.Process.name() in self.paused_by_assistant:
                     should_resume = True
                     break
-            
+
             if should_resume:
                 keyboard.press_and_release('play/pause')
+                print("[MEDIA] Відновлено відтворення.")
             else:
                 print("[MEDIA] Раніше зупинені процеси більше не активні.")
 
         except Exception as e:
-            print(f"❌ Помилка при спробі відновити медіа: {e}")
+            print(f"Помилка при спробі відновити медіа: {e}")
         finally:
             self.paused_by_assistant.clear() # Очищуємо список у будь-якому випадку
 

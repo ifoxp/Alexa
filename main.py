@@ -4,14 +4,46 @@ import pyaudio
 import pvporcupine
 import threading
 import os
+from functools import lru_cache
 from wake_word import WakeWordHandler
 from tray_manager import TrayManager
 import config_manager as cfg
 import settings
+from logger_config import get_logger
+from audio_buffer import BufferedAudioStream
+from memory_manager import memory_manager, ResourceManager, log_memory_usage
+import smart_ai
 
-def listen_loop(tray_manager, handler, porcupine, stream, config):
+logger = get_logger('main')
+
+@lru_cache(maxsize=3)
+def create_porcupine_model(access_key, model_path, sensitivity, is_custom):
+    """Створює Porcupine модель з кешуванням."""
+    cache_key = f"{model_path}_{sensitivity}" if is_custom else f"{model_path}_{sensitivity}"
+
+    logger.info("Creating porcupine model", extra={
+        'model_path': model_path,
+        'sensitivity': sensitivity,
+        'is_custom': is_custom,
+        'cache_key': cache_key
+    })
+
+    if is_custom:
+        return pvporcupine.create(
+            access_key=access_key,
+            keyword_paths=[model_path],
+            sensitivities=[sensitivity]
+        )
+    else:
+        return pvporcupine.create(
+            access_key=access_key,
+            keywords=[model_path],  # model_path містить назву ключового слова
+            sensitivities=[sensitivity]
+        )
+
+def listen_loop(tray_manager, handler, porcupine, buffered_stream, config):
     """
-    Основний цикл, що виконується в окремому потоці.
+    Основний цикл, що виконується в окремому потоці з буферизованим потоком.
     """
     # Визначаємо, яке слово слухаємо, для логування
     if config.get('wakeWordMode') == 'custom' and config.get('customWakeWordPath'):
@@ -19,97 +51,176 @@ def listen_loop(tray_manager, handler, porcupine, stream, config):
     else:
         active_keyword = config.get('wakeWordStandard', 'porcupine')
 
-    print(f"🎤 Слухаю '{active_keyword}'...")
+    logger.info(f"Слухаю '{active_keyword}'...", extra={'wake_word': active_keyword})
+
     while tray_manager.is_running:
         try:
-            pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
-            audio_data = struct.unpack_from("h" * porcupine.frame_length, pcm)
-            keyword_index = porcupine.process(audio_data)
+            # Читаємо з буферизованого потоку
+            audio_data = buffered_stream.read_frame(porcupine.frame_length, timeout=1.0)
 
-            if keyword_index >= 0:
-                handler.on_wake_word_detected(active_keyword)
+            if audio_data and len(audio_data) == porcupine.frame_length:
+                keyword_index = porcupine.process(audio_data)
 
-        except (IOError, OSError) as e:
-            if tray_manager.is_running: print(f"⚠️ Помилка читання аудіо: {e}.")
-            time.sleep(1)
+                if keyword_index >= 0:
+                    logger.info("Wake word detected", extra={
+                        'wake_word': active_keyword,
+                        'keyword_index': keyword_index,
+                        'buffer_stats': buffered_stream.get_buffer_stats()
+                    })
+                    handler.on_wake_word_detected(active_keyword)
+            elif audio_data is None:
+                # Таймаут читання - це нормально
+                continue
+            else:
+                logger.debug("Incomplete audio frame", extra={
+                    'expected': porcupine.frame_length,
+                    'got': len(audio_data) if audio_data else 0
+                })
+
         except Exception as e:
-            if tray_manager.is_running: print(f"❌ Неочікувана помилка в циклі слухання: {e}")
-            break
+            if tray_manager.is_running:
+                logger.error("Unexpected error in listen loop", extra={
+                    'error': str(e),
+                    'error_type': type(e).__name__
+                })
+                time.sleep(0.1)  # Коротка пауза перед повторною спробою
+            else:
+                break
 
+    logger.info("Listen loop terminated")
+
+@log_memory_usage("main_function")
 def main():
     """Головна функція: ініціалізація та очищення."""
-    config = None
-    tray = None
-    porcupine = None
-    audio = None
-    stream = None
+    logger.info("Starting assistant initialization")
 
-    try:
-        config = cfg.load_config()
-        tray = TrayManager("Jarvis Assistant")
-        
-        # --- ОНОВЛЕНА ЛОГІКА ІНІЦІАЛІЗАЦІЇ PORCUPINE ---
-        porcupine_kwargs = {
-            'access_key': config["picovoiceAccessKey"],
-            'sensitivities': [config["sensitivity"]]
-        }
+    with ResourceManager(memory_manager) as resource_mgr:
+        config = None
+        tray = None
+        porcupine = None
+        audio = None
+        buffered_stream = None
 
-        # Перевіряємо режим роботи з конфігу
-        if config.get("wakeWordMode") == "custom":
-            custom_path = config.get("customWakeWordPath")
-            if not custom_path or not os.path.exists(custom_path):
-                print(f"⚠️ Кастомна модель не знайдена: {custom_path}")
-                print("📋 Fallback до стандартної моделі...")
-                # Fallback до стандартної моделі
-                standard_keyword = config.get("wakeWordStandard", "alexa")
-                porcupine_kwargs['keywords'] = [standard_keyword]
-                print(f"✅ Використовується стандартна модель: '{standard_keyword}'")
+        try:
+            config = cfg.load_config()
+            tray = resource_mgr.add(TrayManager("Jarvis Assistant"))
+
+            # --- ІНІЦІАЛІЗАЦІЯ ШІ АСИСТЕНТА ---
+            openai_key = config.get("openaiApiKey", "").strip()
+            ai_enabled = config.get("aiAssistantEnabled", True)
+
+            if ai_enabled and openai_key and openai_key != "YOUR_OPENAI_API_KEY_HERE":
+                if smart_ai.initialize_smart_assistant(openai_key):
+                    logger.info("Smart AI assistant enabled")
+                else:
+                    logger.warning("Failed to initialize AI assistant")
             else:
-                porcupine_kwargs['keyword_paths'] = [custom_path]
-                print(f"✅ Використовується кастомна модель: {os.path.basename(custom_path)}")
+                logger.info("AI assistant disabled - using traditional commands only")
 
-        else: # 'standard' mode (за замовчуванням)
-            standard_keyword = config.get("wakeWordStandard", "alexa")
-            porcupine_kwargs['keywords'] = [standard_keyword]
-            print(f"✅ Використовується стандартна модель: '{standard_keyword}'")
+            # --- ОНОВЛЕНА ЛОГІКА ІНІЦІАЛІЗАЦІЇ PORCUPINE З КЕШЕМ ---
+            access_key = config["picovoiceAccessKey"]
+            sensitivity = config["sensitivity"]
 
-        porcupine = pvporcupine.create(**porcupine_kwargs)
+            # Перевіряємо режим роботи з конфігу
+            if config.get("wakeWordMode") == "custom":
+                custom_path = config.get("customWakeWordPath")
+                if not custom_path or not os.path.exists(custom_path):
+                    logger.warning("Custom wake word model not found", extra={
+                        'custom_path': custom_path,
+                        'fallback': 'standard_model'
+                    })
+                    # Fallback до стандартної моделі
+                    standard_keyword = config.get("wakeWordStandard", "alexa")
+                    porcupine = create_porcupine_model(
+                        access_key=access_key,
+                        model_path=standard_keyword,
+                        sensitivity=sensitivity,
+                        is_custom=False
+                    )
+                    logger.info("Using cached standard wake word model", extra={
+                        'model': standard_keyword,
+                        'type': 'fallback'
+                    })
+                else:
+                    porcupine = create_porcupine_model(
+                        access_key=access_key,
+                        model_path=custom_path,
+                        sensitivity=sensitivity,
+                        is_custom=True
+                    )
+                    logger.info("Using cached custom wake word model", extra={
+                        'model_path': custom_path,
+                        'model_name': os.path.basename(custom_path),
+                        'type': 'custom'
+                    })
+            else: # 'standard' mode (за замовчуванням)
+                standard_keyword = config.get("wakeWordStandard", "alexa")
+                porcupine = create_porcupine_model(
+                    access_key=access_key,
+                    model_path=standard_keyword,
+                    sensitivity=sensitivity,
+                    is_custom=False
+                )
+                logger.info("Using cached standard wake word model", extra={
+                    'model': standard_keyword,
+                    'type': 'standard'
+                })
         # ---------------------------------------------
         
-        handler = WakeWordHandler(tray)
-        audio = pyaudio.PyAudio()
-        stream = audio.open(
-            format=settings.FORMAT,
-            channels=settings.CHANNELS,
-            rate=porcupine.sample_rate,
-            input=True,
-            frames_per_buffer=porcupine.frame_length
-        )
+            # Створюємо handler та аудіо ресурси
+            handler = WakeWordHandler(tray)
+            audio = resource_mgr.add(pyaudio.PyAudio())
 
-        listen_thread = threading.Thread(
-            target=listen_loop,
-            args=(tray, handler, porcupine, stream, config),
-            daemon=True
-        )
-        listen_thread.start()
+            # Створюємо звичайний stream
+            raw_stream = audio.open(
+                format=settings.FORMAT,
+                channels=settings.CHANNELS,
+                rate=porcupine.sample_rate,
+                input=True,
+                frames_per_buffer=512  # Менший розмір для кращої responsiveness
+            )
 
-        print("✅ Асистент запущено у фоновому режимі.")
-        tray.start()
+            # Обгортаємо в буферизований stream
+            buffered_stream = resource_mgr.add(
+                BufferedAudioStream(raw_stream, buffer_size=8192),
+                cleanup_func=lambda s: s.close()
+            )
 
-    except Exception as e:
-        print(f"❌ Критична помилка під час запуску: {e}")
-    finally:
-        print("\n--- Завершення роботи та очищення ресурсів ---")
-        if tray: tray.stop()
-        if porcupine: porcupine.delete()
-        if stream:
-            try:
-                if stream.is_active():
-                    stream.stop_stream()
-                stream.close()
-            except Exception: pass # Ігноруємо помилки при закритті
-        if audio: audio.terminate()
-        print("✅ Програма завершена.")
+            # Запускаємо буферизацію
+            buffered_stream.start_buffering()
+
+            logger.info("Audio system initialized", extra={
+                'sample_rate': porcupine.sample_rate,
+                'buffer_size': 8192
+            })
+
+            # Запускаємо listen loop з буферизованим потоком
+            listen_thread = threading.Thread(
+                target=listen_loop,
+                args=(tray, handler, porcupine, buffered_stream, config),
+                daemon=True
+            )
+            listen_thread.start()
+
+            logger.info("Assistant started successfully")
+            tray.start()
+
+        except Exception as e:
+            logger.error("Critical startup error", extra={
+                'error': str(e),
+                'error_type': type(e).__name__
+            })
+        finally:
+            logger.info("Starting cleanup and resource shutdown")
+            if tray: tray.stop()
+            if porcupine: porcupine.delete()
+            if buffered_stream:
+                try:
+                    buffered_stream.close()
+                except Exception as cleanup_error:
+                    logger.debug("Stream cleanup error", extra={'error': str(cleanup_error)})
+            if audio: audio.terminate()
+            logger.info("Program terminated successfully")
 
 if __name__ == "__main__":
     main()

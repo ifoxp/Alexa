@@ -2,7 +2,6 @@
 import os
 import sys
 import winsound
-import threading
 
 def get_asset_path(filename):
     """Визначає правильний шлях до файлу в папці assets."""

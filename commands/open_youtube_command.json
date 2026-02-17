@@ -1,7 +1,0 @@
-{
-    "name": "open_youtube",
-    "phrases": ["відкрий ютуб", "запусти ютуб", "открой youtube"],
-    "type": "website",
-    "target": "https://www.youtube.com",
-    "requires_argument": false
-}

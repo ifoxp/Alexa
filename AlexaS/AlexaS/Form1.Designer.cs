@@ -49,8 +49,7 @@ namespace AlexaS
             this.trackSensitivity = new System.Windows.Forms.TrackBar();
             this.lblSensitivityValue = new System.Windows.Forms.Label();
             this.lblSensitivity = new System.Windows.Forms.Label();
-            this.cmbLanguage = new System.Windows.Forms.ComboBox();
-            this.lblLanguage = new System.Windows.Forms.Label();
+            // Видалено елементи мови - тепер багатомовний режим автоматично
             this.lblSettingsTitle = new System.Windows.Forms.Label();
             this.panelLeft = new System.Windows.Forms.Panel();
             this.panelWakeWord = new System.Windows.Forms.Panel();
@@ -302,8 +301,7 @@ namespace AlexaS
             this.panelSettings.Controls.Add(this.trackSensitivity);
             this.panelSettings.Controls.Add(this.lblSensitivityValue);
             this.panelSettings.Controls.Add(this.lblSensitivity);
-            this.panelSettings.Controls.Add(this.cmbLanguage);
-            this.panelSettings.Controls.Add(this.lblLanguage);
+            // Видалено контроли мови
             this.panelSettings.Controls.Add(this.lblSettingsTitle);
             this.panelSettings.Dock = System.Windows.Forms.DockStyle.Top;
             this.panelSettings.Location = new System.Drawing.Point(10, 0);
@@ -345,36 +343,7 @@ namespace AlexaS
             this.lblSensitivity.Size = new System.Drawing.Size(69, 15);
             this.lblSensitivity.TabIndex = 3;
             this.lblSensitivity.Text = "Чутливість:";
-            // 
-            // cmbLanguage
-            // 
-            this.cmbLanguage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(65)))), ((int)(((byte)(70)))));
-            this.cmbLanguage.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbLanguage.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.cmbLanguage.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
-            this.cmbLanguage.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(242)))), ((int)(((byte)(247)))));
-            this.cmbLanguage.FormattingEnabled = true;
-            this.cmbLanguage.Items.AddRange(new object[] {
-            "🇺🇦 Українська (uk-UA)",
-            "🇺🇸 Англійська (en-US)",
-            "🇵🇱 Польська (pl-PL)",
-            "🇩🇪 Німецька (de-DE)",
-            "🇷🇺 Російська (ru-RU)"});
-            this.cmbLanguage.Location = new System.Drawing.Point(180, 55);
-            this.cmbLanguage.Name = "cmbLanguage";
-            this.cmbLanguage.Size = new System.Drawing.Size(220, 23);
-            this.cmbLanguage.TabIndex = 2;
-            // 
-            // lblLanguage
-            // 
-            this.lblLanguage.AutoSize = true;
-            this.lblLanguage.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
-            this.lblLanguage.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(142)))), ((int)(((byte)(142)))), ((int)(((byte)(147)))));
-            this.lblLanguage.Location = new System.Drawing.Point(20, 57);
-            this.lblLanguage.Name = "lblLanguage";
-            this.lblLanguage.Size = new System.Drawing.Size(122, 15);
-            this.lblLanguage.TabIndex = 1;
-            this.lblLanguage.Text = "Мова розпізнавання:";
+            // Видалено налаштування мови - тепер автоматично багатомовний режим
             // 
             // lblSettingsTitle
             // 
@@ -810,8 +779,7 @@ namespace AlexaS
         private System.Windows.Forms.Panel panelRight;
         private System.Windows.Forms.Panel panelSettings;
         private System.Windows.Forms.Label lblSettingsTitle;
-        private System.Windows.Forms.Label lblLanguage;
-        private System.Windows.Forms.ComboBox cmbLanguage;
+        // Видалено контроли мови
         private System.Windows.Forms.Label lblSensitivity;
         private System.Windows.Forms.Label lblSensitivityValue;
         private System.Windows.Forms.TrackBar trackSensitivity;

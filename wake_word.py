@@ -1,11 +1,12 @@
 # wake_word.py
 import datetime
 import time
-from stt.online_transcriber import OnlineTranscriber 
+import asyncio
+from transcriber import OnlineTranscriber
 from command_manager import CommandManager
 import settings
 from audio_player import play_listen_sound, play_end_sound
-from media_controller import media_manager # <-- ІМПОРТУЄМО НОВИЙ МЕНЕДЖЕР
+from media_controller import media_manager
 
 class WakeWordHandler:
     def __init__(self, tray_manager):
@@ -42,30 +43,61 @@ class WakeWordHandler:
         print("Сесію команд завершено. Повертаюсь до очікування wake word.")
 
     def listen_for_commands(self):
-        # ... (код цього методу залишається без змін) ...
-        session_end_time = time.time() + settings.COMMAND_SESSION_TIMEOUT
-        
-        print("🎧 Початок сесії слухання команд...")
+        """Синхронна версія для зворотної сумісності."""
+        # Запускаємо async версію в новому event loop
+        if asyncio._get_running_loop() is None:
+            asyncio.run(self.listen_for_commands_async())
+        else:
+            # Якщо вже є event loop, використовуємо task
+            task = asyncio.create_task(self.listen_for_commands_async())
+            # Блокуємо до завершення
+            asyncio.get_event_loop().run_until_complete(task)
+
+    async def listen_for_commands_async(self):
+        """Async версія слухання команд з покращеною логікою."""
+        session_start_time = time.time()
+        session_end_time = session_start_time + settings.COMMAND_SESSION_TIMEOUT
+
+        print("Початок сесії слухання команд...")
+
         while time.time() < session_end_time and self.tray_manager.is_running:
             remaining_time = session_end_time - time.time()
             if remaining_time <= 0:
                 break
-            
-            transcript = self.transcriber.listen_and_transcribe(timeout=remaining_time)
 
-            if transcript:
-                transcript_text = transcript.strip()
-                print(f"💬 Ви сказали: {transcript_text}")
+            # Додаємо silence timeout з config
+            silence_timeout = getattr(settings, 'SILENCE_TIMEOUT', 5.0)
 
-                command, argument = self.command_manager.find_command(transcript_text)
-        
-                if command:
-                    self.command_manager.execute_command(command, argument)
-                    new_end_time = time.time() + settings.CONTINUOUS_LISTEN_SECONDS
-                    session_end_time = max(session_end_time, new_end_time)
-                    print(f"[DEBUG] Сесію продовжено. Залишилось ~{session_end_time - time.time():.1f}с")
+            try:
+                # Використовуємо нову async функцію з детекцією тиші
+                transcript = await self.transcriber.listen_with_silence_detection(
+                    max_timeout=remaining_time,
+                    silence_timeout=silence_timeout
+                )
+
+                if transcript:
+                    transcript_text = transcript.strip()
+                    print(f"Ви сказали: {transcript_text}")
+
+                    command, argument = await self.command_manager.find_command(transcript_text)
+
+                    if command:
+                        result = await self.command_manager.execute_command(command, argument)
+                        if result and isinstance(result, dict):
+                            print(result.get('response_text', 'Команду виконано'))
+                        # Продовжуємо сесію після успішної команди
+                        new_end_time = time.time() + settings.CONTINUOUS_LISTEN_SECONDS
+                        session_end_time = max(session_end_time, new_end_time)
+                        print(f"[DEBUG] Сесію продовжено. Залишилось ~{session_end_time - time.time():.1f}с")
+                    else:
+                        print("Команду не знайдено, слухаю далі...")
                 else:
-                    print(f"🤷 Команду не знайдено, слухаю далі...")
-            else:
-                print("[DEBUG] Таймаут слухання. Завершення сесії.")
+                    print("[DEBUG] Таймаут слухання або тиша. Завершення сесії.")
+                    break
+
+            except asyncio.CancelledError:
+                print("[DEBUG] Слухання команд скасовано")
+                break
+            except Exception as e:
+                print(f"[DEBUG] Помилка під час слухання: {e}")
                 break

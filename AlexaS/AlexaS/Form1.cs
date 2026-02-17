@@ -29,7 +29,7 @@ namespace AlexaS
             public string WakeWordStandard { get; set; } = "jarvis";
             public string CustomWakeWordPath { get; set; } = string.Empty;
             public double Sensitivity { get; set; } = 0.5;
-            public string Language { get; set; } = "uk-UA";
+            // Видалено Language - тепер багатомовний режим автоматично
             public int CommandSessionTimeout { get; set; } = 15;
             public int ContinuousListenSeconds { get; set; } = 7;
             public double SilenceDetectSeconds { get; set; } = 1.5;
@@ -285,9 +285,7 @@ namespace AlexaS
             // Встановлюємо початкове значення чутливості
             UpdateSensitivityLabel();
 
-            // Встановлюємо мову за замовчуванням
-            if (cmbLanguage.SelectedIndex == -1 && cmbLanguage.Items.Count > 0)
-                cmbLanguage.SelectedIndex = 0;
+            // Мову видалено - тепер багатомовний режим автоматично
         }
 
         /// <summary>
@@ -432,12 +430,7 @@ namespace AlexaS
             trackSensitivity.Value = (int)Math.Round(config.Sensitivity * 100);
             UpdateSensitivityLabel();
 
-            // Мова
-            cmbLanguage.SelectedItem = cmbLanguage.Items.Cast<string>()
-                .FirstOrDefault(item => item.StartsWith(config.Language));
-
-            if (cmbLanguage.SelectedIndex == -1 && cmbLanguage.Items.Count > 0)
-                cmbLanguage.SelectedIndex = 0;
+            // Мова видалена - тепер багатомовний режим автоматично
 
             // Таймінги
             numCommandSessionTimeout.Value = Math.Max(numCommandSessionTimeout.Minimum,
@@ -466,7 +459,7 @@ namespace AlexaS
                 WakeWordStandard = cmbWakeWord.SelectedItem?.ToString() ?? "jarvis",
                 CustomWakeWordPath = txtCustomWakeWordPath.Text,
                 Sensitivity = (double)trackSensitivity.Value / 100.0,
-                Language = cmbLanguage.SelectedItem?.ToString().Split(' ')[0] ?? "uk-UA",
+                // Language видалено - багатомовний режим автоматично
                 CommandSessionTimeout = (int)numCommandSessionTimeout.Value,
                 ContinuousListenSeconds = (int)numContinuousListenSeconds.Value,
                 SilenceDetectSeconds = (double)numSilenceDetectSeconds.Value

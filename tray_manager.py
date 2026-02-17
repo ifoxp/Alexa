@@ -1,7 +1,6 @@
 # tray_manager.py
 import pystray
-from PIL import Image, ImageOps
-import threading
+from PIL import Image
 import sys
 import os
 
