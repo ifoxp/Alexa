@@ -1,169 +1,16 @@
 import json
 import asyncio
-import os
-import winreg
-import subprocess
-from pathlib import Path
 from openai import AsyncOpenAI
 from logger_config import get_logger
 
 logger = get_logger('smart_ai')
 
-def scan_installed_programs():
-    """Сканує встановлені програми через Windows Search та реєстр"""
-    programs = {}
-
-    try:
-        # 1. Пошук через Windows Registry (Start Menu programs)
-        logger.info("Searching programs via Windows Registry...")
-        programs.update(_scan_registry_programs())
-
-        # 2. Пошук через PowerShell Get-StartApps (найнадійніший)
-        logger.info("Searching programs via PowerShell Get-StartApps...")
-        programs.update(_scan_powershell_programs())
-
-        # 3. Додаткові системні програми
-        system_programs = {
-            "calculator": "calc.exe",
-            "калькулятор": "calc.exe",
-            "notepad": "notepad.exe",
-            "блокнот": "notepad.exe",
-            "paint": "mspaint.exe",
-            "explorer": "explorer.exe",
-            "провідник": "explorer.exe",
-            "файли": "explorer.exe",
-            "cmd": "cmd.exe",
-            "terminal": "wt.exe",
-            "powershell": "powershell.exe"
-        }
-        programs.update(system_programs)
-
-        logger.info(f"Found {len(programs)} total programs")
-
-    except Exception as e:
-        logger.error(f"Error scanning programs: {e}")
-
-    return programs
-
-def _scan_registry_programs():
-    """Сканує програми через реєстр Windows"""
-    programs = {}
-
-    try:
-        # Uninstall registry keys
-        registry_paths = [
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-        ]
-
-        for reg_path in registry_paths:
-            try:
-                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path)
-                for i in range(winreg.QueryInfoKey(key)[0]):
-                    try:
-                        subkey_name = winreg.EnumKey(key, i)
-                        subkey = winreg.OpenKey(key, subkey_name)
-
-                        try:
-                            display_name = winreg.QueryValueEx(subkey, "DisplayName")[0]
-                            install_location = winreg.QueryValueEx(subkey, "InstallLocation")[0]
-
-                            # Перевіряємо чи є exe файли в директорії
-                            if install_location and os.path.exists(install_location):
-                                for file in os.listdir(install_location):
-                                    if file.lower().endswith('.exe'):
-                                        exe_path = os.path.join(install_location, file)
-                                        app_key = display_name.lower().replace(' ', '_')
-                                        programs[app_key] = exe_path
-                                        break
-                        except FileNotFoundError:
-                            pass
-                        except OSError:
-                            pass
-
-                        winreg.CloseKey(subkey)
-                    except Exception:
-                        continue
-                winreg.CloseKey(key)
-            except Exception:
-                continue
-
-    except Exception as e:
-        logger.error(f"Registry scan error: {e}")
-
-    return programs
-
-def _scan_powershell_programs():
-    """Використовує PowerShell Get-StartApps для пошуку програм"""
-    programs = {}
-
-    try:
-        # PowerShell команда для отримання всіх Start Menu програм
-        ps_command = "Get-StartApps | Where-Object {$_.AppID -like '*.exe*' -or $_.AppID -like '*\\*'} | Select-Object Name, AppID | ConvertTo-Json"
-
-        result = subprocess.run(
-            ["powershell", "-Command", ps_command],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-
-        if result.returncode == 0 and result.stdout.strip():
-            try:
-                apps_data = json.loads(result.stdout)
-                if isinstance(apps_data, dict):
-                    apps_data = [apps_data]  # Якщо один елемент
-
-                for app in apps_data:
-                    name = app.get('Name', '').lower()
-                    app_id = app.get('AppID', '')
-
-                    if name and app_id:
-                        # Мапінг популярних програм
-                        name_mappings = {
-                            'telegram': ['telegram'],
-                            'chrome': ['chrome', 'google chrome'],
-                            'firefox': ['firefox', 'mozilla firefox'],
-                            'discord': ['discord'],
-                            'steam': ['steam'],
-                            'spotify': ['spotify'],
-                            'vlc': ['vlc'],
-                            'obs': ['obs studio'],
-                            'zoom': ['zoom'],
-                            'teams': ['microsoft teams'],
-                            'vscode': ['visual studio code'],
-                            'notepad++': ['notepad++'],
-                            'winrar': ['winrar'],
-                            '7zip': ['7-zip']
-                        }
-
-                        for key, search_terms in name_mappings.items():
-                            if any(term in name for term in search_terms):
-                                programs[key] = app_id
-                                logger.debug(f"Found {key} via PowerShell: {app_id}")
-                                break
-
-                        # Також зберігаємо оригінальну назву
-                        clean_name = name.replace(' ', '_').replace('-', '_')
-                        programs[clean_name] = app_id
-
-            except json.JSONDecodeError as e:
-                logger.error(f"PowerShell JSON decode error: {e}")
-
-    except Exception as e:
-        logger.error(f"PowerShell scan error: {e}")
-
-    return programs
 
 class SmartAssistant:
     def __init__(self, api_key, model="gpt-4o-mini"):
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
-
-        # Сканування встановлених програм
-        logger.info("Scanning installed programs...")
-        self.installed_programs = scan_installed_programs()
-        logger.info(f"Found {len(self.installed_programs)} programs", extra={'programs': list(self.installed_programs.keys())})
+        logger.info("Smart AI assistant initialized")
 
 
 
@@ -231,23 +78,8 @@ confidence: від 0.0 до 1.0"""
             result_text = response.choices[0].message.content.strip()
             logger.info("GPT plugin selection result", extra={'response': result_text})
 
-            # Перевіряємо чи відповідь не пуста
             if not result_text:
-                logger.error("Empty response from GPT-5, falling back to GPT-4o-mini for stage 1")
-                # Fallback на GPT-4o-mini
-                response = await self.client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": "You are a smart assistant that analyzes user commands and selects appropriate plugins."},
-                        {"role": "user", "content": simple_prompt}
-                    ],
-                    max_tokens=150
-                )
-                result_text = response.choices[0].message.content.strip()
-                logger.info("Fallback GPT-4o-mini plugin selection result", extra={'response': result_text})
-
-            if not result_text:
-                return {"success": False, "error": "Empty response from both GPT-5 and GPT-4o-mini"}
+                return {"success": False, "error": "Empty response from GPT"}
 
             try:
                 result = json.loads(result_text)
@@ -288,12 +120,7 @@ confidence: від 0.0 до 1.0"""
                 user_friendly_msg = "Проблеми з підключенням до OpenAI API"
                 logger.error("OpenAI API connection error", extra={'error': error_msg})
             elif "Empty response" in error_msg:
-                # Спробуємо fallback режим
-                manual_result = analyze_command_manually(user_text)
-                if manual_result.get("success"):
-                    return manual_result
-                else:
-                    user_friendly_msg = "OpenAI повернув пусту відповідь і команду не вдалося розпізнати автоматично"
+                user_friendly_msg = "OpenAI повернув пусту відповідь"
             else:
                 user_friendly_msg = f"Помилка ШІ асистента: {error_msg}"
                 logger.error("Plugin selection failed", extra={'error': error_msg})
@@ -353,20 +180,6 @@ confidence: від 0.0 до 1.0"""
             result_text = response.choices[0].message.content.strip()
             logger.info(f"Stage 2 AI response: '{result_text}'")
 
-            if not result_text:
-                logger.error("Empty response from GPT-5, falling back to GPT-4o-mini")
-                # Fallback на GPT-4o-mini
-                response = await self.client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": "You are a smart assistant that generates specific plugin commands. Extract exact parameter values from user text."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=200
-                )
-                result_text = response.choices[0].message.content.strip()
-                logger.info(f"Fallback GPT-4o-mini response: '{result_text}'")
-
             commands_dict = json.loads(result_text)
 
             # Групуємо команди за плагінами
@@ -424,15 +237,6 @@ confidence: від 0.0 до 1.0"""
 # Глобальний екземпляр (ініціалізується в main.py)
 smart_assistant = None
 
-# Глобальний екземпляр для програм (завжди доступний)
-_program_scanner = None
-
-def get_program_mapper():
-    """Повертає мапер програм (завжди доступний, навіть без API ключа)"""
-    global _program_scanner
-    if _program_scanner is None:
-        _program_scanner = SmartAssistant('dummy_key_for_scanning_only')
-    return _program_scanner
 
 def initialize_smart_assistant(api_key):
     """Ініціалізує ШІ асистента з API ключем"""
@@ -441,307 +245,32 @@ def initialize_smart_assistant(api_key):
         try:
             smart_assistant = SmartAssistant(api_key)
             logger.info("Smart AI assistant initialized successfully", extra={
-                'mode': 'AI_enabled',
-                'fallback_available': True,
-                'programs_found': len(smart_assistant.installed_programs)
+                'mode': 'AI_enabled'
             })
             return True
         except Exception as e:
             logger.error("Failed to initialize Smart AI assistant", extra={
-                'error': str(e),
-                'fallback_mode': 'Available'
+                'error': str(e)
             })
             smart_assistant = None
             return False
     else:
         logger.info("OpenAI API key not provided", extra={
-            'mode': 'manual_only',
-            'fallback_available': True,
-            'status': 'System will use manual command recognition'
+            'mode': 'no_ai',
+            'status': 'AI assistant will not be available'
         })
         return False
 
-def extract_program_name_from_text(text):
-    """Розумно виділяє назву програми з тексту команди"""
-    text_lower = text.lower().strip()
 
-    # Видаляємо команди-слова
-    command_words = ['відкрий', 'запуст', 'включи', 'запуск', 'open', 'launch', 'start', 'run']
-    for word in command_words:
-        text_lower = text_lower.replace(word, '').strip()
-
-    # Видаляємо допоміжні слова
-    helper_words = ['програму', 'додаток', 'application', 'program', 'app']
-    for word in helper_words:
-        text_lower = text_lower.replace(word, '').strip()
-
-    # Що залишилось - це ймовірно назва програми
-    program_name = text_lower.strip()
-
-    return program_name if program_name else "unknown"
-
-def analyze_command_manually(user_text):
-    """Резервна система розпізнавання команд без OpenAI API"""
-    logger.info("Using manual command analysis", extra={
-        'user_text': user_text,
-        'mode': 'fallback_manual'
-    })
-
-    text_lower = user_text.lower()
-
-    # Пошук ключових слів для визначення типу команди
-    program_keywords = ['запуст', 'відкр', 'включ', 'запуск', 'open', 'launch', 'start']
-    search_keywords = ['знайд', 'пошук', 'search', 'find', 'ютуб', 'youtube', 'гугл', 'google']
-    volume_keywords = ['гучн', 'тих', 'звук', 'volume', 'mute', 'sound']
-    test_keywords = ['тест', 'test', 'перевір', 'check']
-
-    # Визначаємо тип команди
-    command_type = None
-    if any(keyword in text_lower for keyword in test_keywords):
-        command_type = "test_search"
-    elif any(keyword in text_lower for keyword in program_keywords):
-        command_type = "open_app"
-    elif any(keyword in text_lower for keyword in search_keywords):
-        command_type = "search"
-    elif any(keyword in text_lower for keyword in volume_keywords):
-        command_type = "volume"
-
-    # Формуємо результат у форматі, схожому на GPT відповідь
-    if command_type == "open_app":
-        # Розумне виділення назви програми з тексту
-        target_program = extract_program_name_from_text(user_text)
-
-        logger.info("Manual analysis: detected program launch", extra={
-            'command_type': 'open_app',
-            'target_program': target_program or "unknown",
-            'confidence': 0.7
-        })
-
-        return {
-            "success": True,
-            "plugins": ["windows_programs"],
-            "manual_analysis": True,
-            "details": {
-                "action": "open_app",
-                "target": target_program or "unknown",
-                "confidence": 0.7
-            }
-        }
-
-    elif command_type == "search":
-        search_target = "youtube" if any(word in text_lower for word in ['ютуб', 'youtube']) else "google"
-        query = user_text  # Використовуємо весь текст як запит
-
-        logger.info("Manual analysis: detected search", extra={
-            'command_type': 'search',
-            'platform': search_target,
-            'confidence': 0.8
-        })
-
-        return {
-            "success": True,
-            "plugins": ["browser_search"],
-            "manual_analysis": True,
-            "details": {
-                "action": "search",
-                "platform": search_target,
-                "query": query,
-                "confidence": 0.8
-            }
-        }
-
-    elif command_type == "volume":
-        volume_action = "down" if any(word in text_lower for word in ['тих', 'меньш']) else "up"
-
-        logger.info("Manual analysis: detected volume control", extra={
-            'command_type': 'volume',
-            'action': volume_action,
-            'confidence': 0.8
-        })
-
-        return {
-            "success": True,
-            "plugins": ["system_control"],
-            "manual_analysis": True,
-            "details": {
-                "action": "volume",
-                "type": volume_action,
-                "value": 20,
-                "confidence": 0.8
-            }
-        }
-
-    elif command_type == "test_search":
-        test_query = extract_program_name_from_text(user_text.replace('тест', '').replace('test', '').replace('перевір', ''))
-
-        logger.info("Manual analysis: detected test search", extra={
-            'command_type': 'test_search',
-            'query': test_query,
-            'confidence': 0.9
-        })
-
-        return {
-            "success": True,
-            "plugins": ["windows_programs"],
-            "manual_analysis": True,
-            "details": {
-                "action": "test_search",
-                "query": test_query or "telegram",
-                "confidence": 0.9
-            }
-        }
-
-    logger.warning("Manual analysis: command not recognized", extra={
-        'user_text': user_text,
-        'detected_keywords': [kw for kw in ['запуст', 'відкр', 'включ', 'знайд', 'пошук', 'гучн', 'тих', 'звук', 'тест'] if kw in text_lower]
-    })
-
-    return {
-        "success": False,
-        "manual_analysis": True,
-        "error": "Не вдалося розпізнати команду"
-    }
-
-async def execute_manual_command(user_text, manual_analysis):
-    """Виконує команду в ручному режимі без GPT"""
-    try:
-        from smart_plugin_manager import SmartPluginManager
-
-        # Ініціалізуємо менеджер плагінів
-        plugin_manager = SmartPluginManager()
-
-        selected_plugins = manual_analysis.get("plugins", [])
-        details = manual_analysis.get("details", {})
-
-        logger.info("Executing manual command", extra={
-            'user_text': user_text,
-            'plugins': selected_plugins,
-            'action': details.get('action')
-        })
-
-        execution_results = []
-
-        for plugin_name in selected_plugins:
-            if plugin_name == "windows_programs" and details.get("action") == "open_app":
-                # Виконуємо пошук і запуск програми
-                target = details.get("target", "unknown")
-
-                # Спочатку шукаємо програму
-                search_result = await plugin_manager.execute_plugin_command(
-                    "windows_programs", "search_programs", query=target
-                )
-                execution_results.append({
-                    "plugin": plugin_name,
-                    "command": "search_programs",
-                    "result": search_result
-                })
-
-                # Потім запускаємо, якщо знайшли
-                if search_result.get("success"):
-                    open_result = await plugin_manager.execute_plugin_command(
-                        "windows_programs", "open_program", program_name=target
-                    )
-                    execution_results.append({
-                        "plugin": plugin_name,
-                        "command": "open_program",
-                        "result": open_result
-                    })
-
-            elif plugin_name == "browser_search" and details.get("action") == "search":
-                # Виконуємо пошук
-                platform = details.get("platform", "google")
-                query = details.get("query", user_text)
-
-                command = "search_youtube" if platform == "youtube" else "search_web"
-
-                search_result = await plugin_manager.execute_plugin_command(
-                    "browser_search", command, query=query
-                )
-                execution_results.append({
-                    "plugin": plugin_name,
-                    "command": command,
-                    "result": search_result
-                })
-
-            elif plugin_name == "system_control" and details.get("action") == "volume":
-                # Керуємо звуком
-                volume_type = details.get("type", "up")
-                value = details.get("value", 20)
-
-                command = "volume_up" if volume_type == "up" else "volume_down"
-
-                volume_result = await plugin_manager.execute_plugin_command(
-                    "system_control", command, step=value
-                )
-                execution_results.append({
-                    "plugin": plugin_name,
-                    "command": command,
-                    "result": volume_result
-                })
-
-            elif plugin_name == "windows_programs" and details.get("action") == "test_search":
-                # Тестуємо пошук
-                query = details.get("query", "telegram")
-
-                test_result = await plugin_manager.execute_plugin_command(
-                    "windows_programs", "test_search", query=query
-                )
-                execution_results.append({
-                    "plugin": plugin_name,
-                    "command": "test_search",
-                    "result": test_result
-                })
-
-        # Аналізуємо результати
-        successful_commands = [r for r in execution_results if r["result"].get("success")]
-
-        if successful_commands:
-            success_messages = [r["result"].get("message", "OK") for r in successful_commands]
-            message = "; ".join(success_messages)
-
-            return {
-                "success": True,
-                "action": {
-                    "type": "manual_execution",
-                    "results": execution_results,
-                    "successful_count": len(successful_commands),
-                    "total_count": len(execution_results)
-                },
-                "message": message
-            }
-        else:
-            return {
-                "success": False,
-                "message": "Команду не вдалося виконати в ручному режимі",
-                "fallback": True
-            }
-
-    except Exception as e:
-        logger.error("Manual command execution failed", extra={
-            'error': str(e),
-            'error_type': type(e).__name__,
-            'user_text': user_text
-        })
-        return {
-            "success": False,
-            "message": f"Помилка виконання команди: {str(e)}",
-            "fallback": True
-        }
 
 async def process_smart_command(user_text):
-    """Основна функція для обробки команд через ШІ (2-етапна система) з fallback"""
+    """Основна функція для обробки команд через ШІ (2-етапна система)"""
     if not smart_assistant:
-        logger.info("AI assistant not configured, using manual command analysis")
-        # Використовуємо резервну систему
-        manual_result = analyze_command_manually(user_text)
-        if manual_result.get("success"):
-            return await execute_manual_command(user_text, manual_result)
-        else:
-            return {
-                "success": False,
-                "message": "ШІ асистент не налаштовано і команду не вдалося розпізнати",
-                "fallback": True
-            }
+        logger.error("AI assistant not configured")
+        return {
+            "success": False,
+            "message": "ШІ асистент не налаштовано. Перевірте API ключ у config.json"
+        }
 
     try:
         from smart_plugin_manager import SmartPluginManager
@@ -749,35 +278,17 @@ async def process_smart_command(user_text):
         # Ініціалізуємо менеджер плагінів
         if not hasattr(smart_assistant, 'plugin_manager'):
             logger.info("Initializing SmartPluginManager")
-            try:
-                smart_assistant.plugin_manager = SmartPluginManager()
-                logger.info("SmartPluginManager initialized successfully")
-            except Exception as e:
-                import traceback
-                logger.error("Failed to initialize SmartPluginManager", extra={
-                    'error': str(e),
-                    'traceback': traceback.format_exc()
-                })
-                return {
-                    "success": False,
-                    "message": f"Помилка ініціалізації плагінів: {str(e)}",
-                    "fallback": True
-                }
+            smart_assistant.plugin_manager = SmartPluginManager()
+            logger.info("SmartPluginManager initialized successfully")
 
         # ЕТАП 1: GPT обирає потрібні плагіни
         plugin_selection = await smart_assistant.select_plugins(user_text)
 
         if not plugin_selection.get("success"):
-            # Спробуємо ручний режим
-            manual_result = analyze_command_manually(user_text)
-            if manual_result.get("success"):
-                return await execute_manual_command(user_text, manual_result)
-            else:
-                return {
-                    "success": False,
-                    "message": "Не вдалося визначити потрібні плагіни",
-                    "fallback": True
-                }
+            return {
+                "success": False,
+                "message": "Не вдалося визначити потрібні плагіни"
+            }
 
         selected_plugins = plugin_selection.get("plugins", [])
 
@@ -788,8 +299,7 @@ async def process_smart_command(user_text):
         if not execution_plan:
             return {
                 "success": False,
-                "message": "Не вдалося створити план виконання",
-                "fallback": True
+                "message": "Не вдалося створити план виконання"
             }
 
         # ЕТАП 3: Виконуємо команди
@@ -815,13 +325,11 @@ async def process_smart_command(user_text):
                     "result": result
                 })
 
-                # Якщо команда не вдалася - можемо зупинити виконання або продовжити
                 if not result.get("success"):
                     logger.warning(f"Command failed: {plugin_name}.{command_name}")
 
         # Аналізуємо результати
         successful_commands = [r for r in execution_results if r["result"].get("success")]
-        failed_commands = [r for r in execution_results if not r["result"].get("success")]
 
         if successful_commands:
             success_messages = [r["result"].get("message", "OK") for r in successful_commands]
@@ -840,8 +348,7 @@ async def process_smart_command(user_text):
         else:
             return {
                 "success": False,
-                "message": "Жодна команда не виконалася успішно",
-                "fallback": True
+                "message": "Жодна команда не виконалася успішно"
             }
 
     except Exception as e:
@@ -849,69 +356,26 @@ async def process_smart_command(user_text):
         error_type = type(e).__name__
         error_msg = str(e)
 
-        # Покращена обробка помилок з конкретними порадами та fallback
+        # Конкретні повідомлення про помилки
         if "401" in error_msg or "Unauthorized" in error_msg:
-            logger.error("OpenAI API authorization failed, trying fallback mode", extra={
-                'error': error_msg,
-                'error_type': error_type,
-                'user_text': user_text,
-                'solution': 'Перевірте openaiApiKey у config.json'
-            })
-            # Спробуємо fallback режим
-            manual_result = analyze_command_manually(user_text)
-            if manual_result.get("success"):
-                logger.info("Using fallback manual command analysis due to API error")
-                return await execute_manual_command(user_text, manual_result)
-            else:
-                user_message = "Помилка авторизації OpenAI API і команду не вдалося розпізнати автоматично"
-
+            user_message = "Помилка авторизації OpenAI API. Перевірте API ключ у config.json"
         elif "timeout" in error_msg.lower() or "TimeoutError" in error_type:
-            logger.error("OpenAI API timeout, trying fallback mode", extra={
-                'error': error_msg,
-                'error_type': error_type,
-                'user_text': user_text
-            })
-            # Спробуємо fallback режим
-            manual_result = analyze_command_manually(user_text)
-            if manual_result.get("success"):
-                logger.info("Using fallback manual command analysis due to timeout")
-                return await execute_manual_command(user_text, manual_result)
-            else:
-                user_message = "Таймаут з'єднання з OpenAI API і команду не вдалося розпізнати автоматично"
-
+            user_message = "Таймаут з'єднання з OpenAI API"
         elif "network" in error_msg.lower() or "connection" in error_msg.lower():
-            logger.error("Network error, trying fallback mode", extra={
-                'error': error_msg,
-                'error_type': error_type,
-                'user_text': user_text
-            })
-            # Спробуємо fallback режим
-            manual_result = analyze_command_manually(user_text)
-            if manual_result.get("success"):
-                logger.info("Using fallback manual command analysis due to network error")
-                return await execute_manual_command(user_text, manual_result)
-            else:
-                user_message = "Проблеми з мережею і команду не вдалося розпізнати автоматично"
-
+            user_message = "Проблеми з підключенням до OpenAI API"
         elif "SmartPluginManager" in error_msg:
-            user_message = "Помилка завантаження плагінів системи."
-            logger.error("Plugin system initialization failed", extra={
-                'error': error_msg,
-                'error_type': error_type,
-                'user_text': user_text,
-                'traceback': traceback.format_exc()
-            })
+            user_message = "Помилка завантаження плагінів системи"
         else:
-            user_message = f"Загальна помилка ШІ асистента: {error_msg}"
-            logger.error("Smart command processing failed", extra={
-                'error': error_msg,
-                'error_type': error_type,
-                'user_text': user_text,
-                'traceback': traceback.format_exc()
-            })
+            user_message = f"Помилка ШІ асистента: {error_msg}"
+
+        logger.error("Smart command processing failed", extra={
+            'error': error_msg,
+            'error_type': error_type,
+            'user_text': user_text,
+            'traceback': traceback.format_exc()
+        })
 
         return {
             "success": False,
-            "message": user_message,
-            "fallback": True
+            "message": user_message
         }
