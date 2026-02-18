@@ -50,27 +50,42 @@ class EdgeTTS:
             'ostap': 'uk-UA-OstapNeural'        # Чоловічий український (альтернативна назва)
         }
 
-    def speak(self, text, voice_type="jarvis"):
+    def speak(self, text, voice_type="jarvis", rate="+10%"):
         """Синхронний TTS через subprocess (уникає конфлікти event loop)"""
         try:
             voice = self.voices.get(voice_type, 'uk-UA-OstapNeural')
-            logger.info(f"Using Edge TTS voice: {voice}")
+            logger.info(f"Using Edge TTS voice: {voice} with rate: {rate}")
 
             # Створюємо тимчасовий файл
             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
                 temp_path = temp_file.name
 
             try:
-                # Запускаємо edge-tts через командний рядок
+                # Налаштування для приховання вікна консолі на Windows
+                startupinfo = None
+                if os.name == 'nt':
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0  # 0 = SW_HIDE
+
+                # Запускаємо edge-tts через командний рядок з параметром швидкості
                 cmd = [
                     'python', '-m', 'edge_tts',
                     '--voice', voice,
+                    '--rate', rate,
                     '--text', text,
                     '--write-media', temp_path
                 ]
 
-                # Виконуємо команду
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                # Виконуємо команду з переданим startupinfo
+                result = subprocess.run(
+                    cmd, 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=10,
+                    startupinfo=startupinfo, # <--- Додано цей параметр
+                    creationflags=0x08000000 if os.name == 'nt' else 0 # <--- Додатковий захист (CREATE_NO_WINDOW)
+                )
 
                 if result.returncode == 0:
                     # Відтворюємо файл
@@ -97,6 +112,8 @@ class EdgeTTS:
         except Exception as e:
             logger.error(f"Edge TTS error: {e}")
             return False
+
+
 
 class ElevenLabsTTS:
     """Клас для роботи з ElevenLabs TTS (преміум якість)"""
@@ -391,6 +408,24 @@ def get_edge_tts():
         _edge_tts = EdgeTTS()
     return _edge_tts
 
+def get_voice_by_wake_word(config):
+    """Визначає голос на основі wake word"""
+    wake_word_mode = config.get("wakeWordMode", "standard")
+
+    if wake_word_mode == "standard":
+        wake_word = config.get("wakeWordStandard", "alexa").lower()
+
+        if wake_word == "jarvis":
+            return "jarvis"  # Чоловічий голос (Ostap)
+        elif wake_word == "alexa":
+            return "polina"  # Жіночий голос (Polina)
+        else:
+            # Для інших wake words використовуємо налаштування
+            return config.get("ttsVoice", "jarvis")
+    else:
+        # Для custom wake word використовуємо налаштування з конфігу
+        return config.get("ttsVoice", "jarvis")
+
 def speak_text(text, config=None):
     """Швидка функція для мовлення тексту з конфігурацією"""
     if not config:
@@ -406,10 +441,15 @@ def speak_text(text, config=None):
     if tts_engine == "edge":
         # Використовуємо Edge TTS (найкращий для української)
         edge_tts = get_edge_tts()
-        voice_type = config.get("ttsVoice", "jarvis")
 
-        logger.info(f"Using Edge TTS for: '{text[:50]}...' with voice: {voice_type}")
-        return edge_tts.speak(text, voice_type=voice_type)
+        # Автоматично вибираємо голос за wake word
+        voice_type = get_voice_by_wake_word(config)
+
+        # Швидкість мовлення
+        rate = config.get("ttsRate", "+10%")
+
+        logger.info(f"Using Edge TTS for: '{text[:50]}...' with voice: {voice_type}, rate: {rate}")
+        return edge_tts.speak(text, voice_type=voice_type, rate=rate)
 
     elif tts_engine == "google":
         # Використовуємо Google TTS
