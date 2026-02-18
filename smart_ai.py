@@ -1,19 +1,17 @@
 import json
 import asyncio
+from datetime import datetime
 from openai import AsyncOpenAI
 from logger_config import get_logger
+from audio_player import speak_text
 
 logger = get_logger('smart_ai')
-
 
 class SmartAssistant:
     def __init__(self, api_key, model="gpt-4o-mini"):
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
-        logger.info("Smart AI assistant initialized")
-
-
-
+        self.plugin_manager = None
 
     async def select_plugins(self, user_text: str):
         """ЕТАП 1: GPT обирає потрібні плагіни для обробки команди."""
@@ -39,69 +37,70 @@ class SmartAssistant:
 ДОСТУПНІ ПЛАГІНИ:
 {plugins_text}
 
-Твоя задача: проаналізувати команду і повернути JSON зі списком потрібних плагінів.
+ВАЖЛИВО: Спочатку визнач - це КОМАНДА чи просто РОЗМОВА?
+
+КОМАНДИ (потребують виконання):
+- "відкрий Steam"
+- "знайди котиків на ютубі"
+- "зроби звук тихіше"
+- "запусти телеграм"
+
+НЕ КОМАНДИ (звичайна розмова):
+- "прикольна відкрив мені Steam"
+- "класно, спасибо"
+- "це що, круто"
+- "ну даже покруче"
+- "зрозумів проблему?"
+
+Якщо це НЕ команда - поверни {{"isCommand": false}}
+Якщо це команда - поверни плагіни для виконання.
 
 ФОРМАТ ВІДПОВІДІ (тільки JSON):
-{{"success": true, "plugins": ["назва_плагіна1", "назва_плагіна2"], "confidence": 0.95}}
+{{"isCommand": true, "success": true, "plugins": ["назва_плагіна1"], "confidence": 0.95}}
+АБО
+{{"isCommand": false}}
 
 ПРИКЛАДИ:
-"запусти телеграм" → {{"success": true, "plugins": ["windows_programs"], "confidence": 0.95}}
-"знайди котиків на ютубі" → {{"success": true, "plugins": ["browser_search"], "confidence": 0.90}}
-"запусти телеграм і знайди музику" → {{"success": true, "plugins": ["windows_programs", "browser_search"], "confidence": 0.85}}
-"зроби тихіше" → {{"success": true, "plugins": ["system_control"], "confidence": 0.95}}
-
-confidence: від 0.0 до 1.0"""
-
-            # Простий промпт для вибору плагінів
-            simple_prompt = f"""Користувач каже: "{user_text}"
-
-Список плагінів:
-{plugins_text}
-
-Дай номери плагінів які підходять під цей запит.
-Відповідь у форматі JSON: {{"plugins": [1,2,3]}}
-
-Приклади:
-"запусти telegram і зроби звук на 50%" -> {{"plugins": [1,2]}}
-"знайди котиків на youtube" -> {{"plugins": [2]}}
-"відкрий браузер" -> {{"plugins": [1]}}"""
+"запусти телеграм" → {{"isCommand": true, "success": true, "plugins": ["windows_programs"], "confidence": 0.95}}
+"знайди котиків на ютубі" → {{"isCommand": true, "success": true, "plugins": ["browser_search"], "confidence": 0.90}}
+"прикольна відкрив мені Steam" → {{"isCommand": false}}
+"класно, спасибо" → {{"isCommand": false}}"""
 
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": "You are a smart assistant that analyzes user commands and selects appropriate plugins."},
-                    {"role": "user", "content": simple_prompt}
+                    {"role": "user", "content": prompt}
                 ],
                 max_tokens=150
             )
 
             result_text = response.choices[0].message.content.strip()
-            logger.info("GPT plugin selection result", extra={'response': result_text})
+            logger.info(f"GPT plugin selection result: {result_text}")
 
             if not result_text:
                 return {"success": False, "error": "Empty response from GPT"}
 
             try:
                 result = json.loads(result_text)
-                plugin_numbers = result.get("plugins", [])
 
-                if plugin_numbers:
-                    # Конвертуємо номери в назви плагінів
-                    selected_plugin_names = []
-                    for num in plugin_numbers:
-                        try:
-                            plugin_index = num - 1  # Номери починаються з 1
-                            if 0 <= plugin_index < len(plugins_summary):
-                                plugin_name = plugins_summary[plugin_index]['name']
-                                selected_plugin_names.append(plugin_name)
-                        except (IndexError, KeyError):
-                            continue
+                # Перевіряємо чи це команда взагалі
+                is_command = result.get("isCommand", True)  # За замовчуванням вважаємо командою (для сумісності)
 
-                    if selected_plugin_names:
-                        return {"success": True, "plugins": selected_plugin_names}
+                if not is_command:
+                    logger.info("Detected casual talk, not a command")
+                    return {"success": False, "error": "Not a command", "casual_talk": True}
+
+                # Якщо це команда - обробляємо як раніше
+                plugin_names = result.get("plugins", [])
+                logger.info(f"Parsed plugin names: {plugin_names}")
+
+                if plugin_names:
+                    return {"success": True, "plugins": plugin_names}
 
                 return {"success": False, "error": "No valid plugins selected"}
             except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error: {e}, GPT response was: {result_text}")
                 return {"success": False, "error": "Invalid JSON response"}
 
         except Exception as e:
@@ -149,23 +148,43 @@ confidence: від 0.0 до 1.0"""
 
         commands_text = '\n'.join(all_commands)
 
-        prompt = f"""Користувач каже: "{user_text}"
+        prompt = f"""Команда користувача: "{user_text}"
 
 Доступні команди:
 {commands_text}
 
-Твоя задача підібрати команди які підходять під запит і написати їх у форматі JSON.
-ВАЖЛИВО: витягуй точні значення параметрів з тексту користувача!
+Проаналізуй команду і поверни JSON з потрібними командами + природною відповіддю для озвучування.
+
+ВАЖЛИВО:
+- Використовуй ТОЧНО ті програми що згадав користувач
+- Не додавай програми які користувач не просив
+- Якщо користувач каже "Steam discord", то тільки Steam та Discord
+- Додай природну відповідь українською як справжній Джарвіс
 
 ДЛЯ МНОЖИННИХ ПРОГРАМ використовуй нумеровані ключі:
 
 Приклади:
-"запусти Steam і зроби звук на 77%" -> {{"open_program": "Steam", "set_volume": "77"}}
-"відкрий Steam Epic Games Spotify і Word" -> {{"open_program1": "Steam", "open_program2": "Epic Games", "open_program3": "Spotify", "open_program4": "Word"}}
-"знайди котиків на youtube" -> {{"search_youtube": "котики"}}
-"зроби тихіше на 20" -> {{"volume_down": "20"}}
+"запусти Steam і зроби звук на 77%" -> {{
+  "commands": {{"open_program": "Steam", "set_volume": "77"}},
+  "response": "Добре, запускаю Steam і встановлюю гучність на 77 відсотків"
+}}
 
-Формат відповіді: {{"команда1": "параметр1", "команда2": "параметр2"}}"""
+"відкрий Steam discord" -> {{
+  "commands": {{"open_program1": "Steam", "open_program2": "Discord"}},
+  "response": "Окей, відкриваю Steam і Discord для вас"
+}}
+
+"знайди котиків на youtube" -> {{
+  "commands": {{"search_youtube": "котики"}},
+  "response": "Шукаю котиків на YouTube"
+}}
+
+"зроби тихіше на 20" -> {{
+  "commands": {{"volume_down": "20"}},
+  "response": "Зменшую гучність на 20 відсотків"
+}}
+
+Формат відповіді: {{"commands": {{"команда1": "параметр1"}}, "response": "природна відповідь українською"}}"""
 
         try:
             response = await self.client.chat.completions.create(
@@ -180,7 +199,13 @@ confidence: від 0.0 до 1.0"""
             result_text = response.choices[0].message.content.strip()
             logger.info(f"Stage 2 AI response: '{result_text}'")
 
-            commands_dict = json.loads(result_text)
+            parsed_result = json.loads(result_text)
+
+            # Отримуємо команди і відповідь від GPT
+            commands_dict = parsed_result.get("commands", {})
+            natural_response = parsed_result.get("response", "")
+
+            logger.info(f"Natural response from AI: '{natural_response}'")
 
             # Групуємо команди за плагінами
             plugin_commands = {}
@@ -200,11 +225,12 @@ confidence: від 0.0 до 1.0"""
                 else:
                     logger.warning(f"Command {base_command} (from {command_name}) not found in any plugin")
 
-            # Створюємо execution_plan
+            # Створюємо execution_plan з природною відповіддю
             for plugin_name, commands_list in plugin_commands.items():
                 execution_plan.append({
                     "plugin": plugin_name,
-                    "commands": commands_list
+                    "commands": commands_list,
+                    "natural_response": natural_response  # Додаємо природну відповідь
                 })
 
         except Exception as e:
@@ -276,15 +302,26 @@ async def process_smart_command(user_text):
         from smart_plugin_manager import SmartPluginManager
 
         # Ініціалізуємо менеджер плагінів
-        if not hasattr(smart_assistant, 'plugin_manager'):
+        if not hasattr(smart_assistant, 'plugin_manager') or smart_assistant.plugin_manager is None:
             logger.info("Initializing SmartPluginManager")
             smart_assistant.plugin_manager = SmartPluginManager()
             logger.info("SmartPluginManager initialized successfully")
 
         # ЕТАП 1: GPT обирає потрібні плагіни
         plugin_selection = await smart_assistant.select_plugins(user_text)
+        logger.info(f"Plugin selection result: {plugin_selection}")
 
         if not plugin_selection.get("success"):
+            # Перевіряємо чи це звичайна розмова
+            if plugin_selection.get("casual_talk"):
+                logger.info("User is having casual talk, not executing commands")
+                return {
+                    "success": False,
+                    "message": "Розмова розпізнана, команда не виконується",
+                    "casual_talk": True
+                }
+
+            logger.warning(f"Plugin selection failed: {plugin_selection}")
             return {
                 "success": False,
                 "message": "Не вдалося визначити потрібні плагіни"
@@ -332,8 +369,30 @@ async def process_smart_command(user_text):
         successful_commands = [r for r in execution_results if r["result"].get("success")]
 
         if successful_commands:
-            success_messages = [r["result"].get("message", "OK") for r in successful_commands]
-            message = "; ".join(success_messages)
+            # Використовуємо природну відповідь від AI замість технічних повідомлень
+            natural_response = ""
+
+            # Шукаємо природну відповідь в execution_plan
+            for plugin_info in execution_plan:
+                if plugin_info.get("natural_response"):
+                    natural_response = plugin_info.get("natural_response")
+                    break
+
+            # Якщо немає природної відповіді, використовуємо технічні повідомлення
+            if not natural_response:
+                success_messages = [r["result"].get("message", "OK") for r in successful_commands]
+                final_message = "; ".join(success_messages)
+            else:
+                final_message = natural_response
+                logger.info(f"Using natural AI response: {natural_response}")
+
+            # Голосова відповідь при успішному виконанні
+            try:
+                import config_manager as cfg
+                config = cfg.load_config()
+                speak_text(final_message, config)
+            except Exception as tts_error:
+                logger.debug(f"TTS error: {tts_error}")
 
             return {
                 "success": True,
@@ -343,12 +402,22 @@ async def process_smart_command(user_text):
                     "successful_count": len(successful_commands),
                     "total_count": len(execution_results)
                 },
-                "message": message
+                "message": final_message
             }
         else:
+            final_message = "Жодна команда не виконалася успішно"
+
+            # Голосова відповідь при неуспішному виконанні
+            try:
+                import config_manager as cfg
+                config = cfg.load_config()
+                speak_text("Команду не вдалося виконати", config)
+            except Exception as tts_error:
+                logger.debug(f"TTS error: {tts_error}")
+
             return {
                 "success": False,
-                "message": "Жодна команда не виконалася успішно"
+                "message": final_message
             }
 
     except Exception as e:

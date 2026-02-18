@@ -17,7 +17,7 @@ class WindowsProgramsPlugin(SmartPlugin):
 
     @property
     def description(self) -> str:
-        return "Пошук та запуск будь-яких програм Windows."
+        return "Запуск програм Windows: Steam, Discord, Telegram, браузери, ігри, додатки (наприклад: 'відкрий Steam', 'запусти Discord')"
 
     @property
     def commands(self) -> Dict[str, str]:
