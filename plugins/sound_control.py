@@ -1,4 +1,4 @@
-# system_control.py
+# sound_control.py
 import os
 import traceback
 import psutil
@@ -16,7 +16,7 @@ class SystemControlPlugin(SmartPlugin):
 
     @property
     def name(self) -> str:
-        return "system_control"
+        return "sound_control"
 
     @property
     def description(self) -> str:

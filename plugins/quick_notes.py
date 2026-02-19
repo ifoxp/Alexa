@@ -18,7 +18,7 @@ class QuickNotesPlugin(SmartPlugin):
 
     @property
     def description(self) -> str:
-        return "Розумні нотатки: зберігає файли на справжньому Робочому столі користувача."
+        return "Швидке створення нотаток, заміток, напоминалок, ідей."
 
     @property
     def commands(self) -> Dict[str, str]:

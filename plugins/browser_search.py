@@ -19,8 +19,8 @@ class BrowserSearchPlugin(SmartPlugin):
     def commands(self) -> Dict[str, str]:
         return {
             "search_youtube": "знайти відео на YouTube за запитом",
-            "search_google": "пошук в Google за запитом",
-            "open_website": "відкрити веб-сайт за URL або назвою",
+            "search_google": "пошук в Google за запитом, включаючи пошук контенту на конкретних сайтах",
+            "open_website": "відкрити веб-сайт за прямим URL (тільки для готових посилань типу google.com)",
             "search_youtube_channel": "знайти канал на YouTube"
         }
 
@@ -115,17 +115,25 @@ class BrowserSearchPlugin(SmartPlugin):
             }
 
         try:
+            # Очищуємо запит від site: параметрів що можуть зламати посилання
+            clean_query = query
+            if "site:" in clean_query:
+                # Видаляємо всі site: параметри
+                import re
+                clean_query = re.sub(r'\s*site:[^\s]+', '', clean_query).strip()
+                print(f"[CLEAN] Removed site: parameter from '{query}' -> '{clean_query}'")
+
             # Формуємо URL для Google пошуку
-            search_query = query.replace(" ", "+")
+            search_query = clean_query.replace(" ", "+")
             google_url = f"https://www.google.com/search?q={search_query}"
 
             webbrowser.open(google_url)
-            self.log_info(f"Opened Google search: {query}")
+            self.log_info(f"Opened Google search: {clean_query}")
 
             return {
                 "success": True,
-                "result": {"url": google_url, "query": query},
-                "message": f"Відкрито пошук в Google: {query}"
+                "result": {"url": google_url, "query": clean_query},
+                "message": f"Відкрито пошук в Google: {clean_query}"
             }
 
         except Exception as e:

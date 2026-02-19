@@ -5,7 +5,8 @@ import asyncio
 from transcriber import OnlineTranscriber
 from command_manager import CommandManager
 import settings
-from audio_player import play_listen_sound, play_end_sound
+from audio_player import play_listen_sound, play_end_sound, handle_wake_word_response, handle_session_end
+import config_manager as cfg
 from media_controller import media_manager
 
 class WakeWordHandler:
@@ -29,11 +30,14 @@ class WakeWordHandler:
         media_manager.pause_if_playing()
         
         self.tray_manager.set_icon_state(True)
-        play_listen_sound()
-        
+
+        # Завантажуємо конфігурацію для правильного вибору звук/TTS
+        config = cfg.load_config()
+        handle_wake_word_response(config)
+
         self.listen_for_commands()
-        
-        play_end_sound()
+
+        handle_session_end(config)
         self.tray_manager.set_icon_state(False)
         
         # 2. Розумне відновлення: відновлює, ТІЛЬКИ ЯКЩО ми самі ставили на паузу
@@ -77,7 +81,7 @@ class WakeWordHandler:
 
                 if transcript:
                     transcript_text = transcript.strip()
-                    print(f"Ви сказали: {transcript_text}")
+                    print(f"🔥 Ви сказали: {transcript_text}")
 
                     command, argument = await self.command_manager.find_command(transcript_text)
 

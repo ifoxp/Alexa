@@ -20,11 +20,19 @@ class OnlineTranscriber:
         self.current_language_index = 0
         self.current_language = self.languages[0]
         
-        # Початкове калібрування
+        # Початкове калібрування з покращеними налаштуваннями
         with self.microphone as source:
             logger.info("Starting microphone calibration")
-            self.recognizer.adjust_for_ambient_noise(source, duration=1)
-            logger.info("Microphone calibration completed")
+            self.recognizer.adjust_for_ambient_noise(source, duration=2.0)
+            
+            # ФІКСУЄМО поріг гучності (щоб він не стрибав і не ковтав тихі слова)
+            self.recognizer.dynamic_energy_threshold = False
+            self.recognizer.energy_threshold = 400 # Якщо все ще не чує тихі звуки - зменш до 300
+            
+            self.recognizer.pause_threshold = 1.5  # 2.0 забагато, він буде довго "тупити" після фрази
+            self.recognizer.phrase_threshold = 0.1 # Робимо його дуже чутливим до початку слів
+            self.recognizer.non_speaking_duration = 0.5
+            logger.info("Microphone calibration completed with optimized settings")
 
     def set_language(self, lang_code):
         """Встановлює конкретну мову."""
@@ -87,13 +95,15 @@ class OnlineTranscriber:
             return None
 
         with self.microphone as source:
-            # Швидке калібрування перед кожним слуханням
-            self.recognizer.adjust_for_ambient_noise(source, duration=0.2)
-            self.recognizer.pause_threshold = settings.SILENCE_DETECT_SECONDS
-
+          
             try:
                 print(f" M... (очікую до {timeout:.1f}с)")
-                audio = self.recognizer.listen(source, timeout=timeout)
+                # Додаємо phrase_time_limit для захоплення довших фраз
+                audio = self.recognizer.listen(
+                    source,
+                    timeout=timeout,
+                    phrase_time_limit=10  # Максимум 10 секунд на фразу
+                )
             except sr.WaitTimeoutError:
                 return None
 
@@ -152,11 +162,14 @@ class OnlineTranscriber:
 
     async def listen_with_silence_detection(self, max_timeout, silence_timeout):
         """
-        Слухає з детекцією тиші - якщо silence_timeout секунд тиші, то зупиняється.
+        Покращена детекція тиші з кращим захопленням повних фраз.
         max_timeout - максимальний час слухання взагалі.
+        silence_timeout - час тиші після якого зупиняється.
         """
         start_time = asyncio.get_event_loop().time()
-        last_speech_time = start_time
+
+        # Збільшуємо час для одного слухання, щоб краще захоплювати повні фрази
+        listen_chunk_time = min(max_timeout, 5.0)  # Максимум 5 секунд за раз
 
         while True:
             current_time = asyncio.get_event_loop().time()
@@ -166,23 +179,26 @@ class OnlineTranscriber:
                 print(f"[DEBUG] Досягнуто максимальний таймаут {max_timeout}с")
                 return None
 
-            # Перевіряємо чи не вийшов таймаут тиші
-            if current_time - last_speech_time > silence_timeout:
-                print(f"[DEBUG] Тиша {silence_timeout}с - завершення слухання")
-                return None
-
-            # Слухаємо короткими інтервалами
             remaining_time = min(
                 max_timeout - (current_time - start_time),
-                silence_timeout - (current_time - last_speech_time),
-                2.0  # максимум 2 секунди за раз
+                listen_chunk_time
             )
 
+            if remaining_time <= 0:
+                print(f"[DEBUG] Час сесії вичерпано")
+                return None
+
+            # Слухаємо довші інтервали для кращого захоплення речень
             transcript = await self.listen_and_transcribe_async(remaining_time)
 
-            if transcript:
-                last_speech_time = asyncio.get_event_loop().time()
-                return transcript
+            if transcript and transcript.strip():
+                print(f"[DEBUG] Отримано транскрипт: '{transcript.strip()}'")
+                return transcript.strip()
 
-            # Короткий sleep щоб не навантажувати процесор
-            await asyncio.sleep(0.1)
+            # Якщо тишу вже довго, завершуємо
+            if current_time - start_time > silence_timeout:
+                print(f"[DEBUG] Тривала тиша {silence_timeout}с - завершення слухання")
+                return None
+
+            # Коротка пауза перед наступною спробою
+            await asyncio.sleep(0.2)

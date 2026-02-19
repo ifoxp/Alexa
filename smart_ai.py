@@ -9,22 +9,49 @@ logger = get_logger('smart_ai')
 
 class SmartAssistant:
     def __init__(self, api_key, model="gpt-4o-mini"):
-        self.client = AsyncOpenAI(api_key=api_key)
+        self.client = AsyncOpenAI(
+            api_key=api_key,
+            timeout=15.0,  # Глобальний таймаут для всіх запитів
+            max_retries=2   # Максимум 2 спроби
+        )
         self.model = model
         self.plugin_manager = None
+        # Контекст для Jarvis-стилю
+        self.conversation_history = []  # Останні 2 фрази користувача
+        self.last_responses = []  # Останні 2 відповіді Jarvis
+        self.used_greetings = set()  # Щоб не повторювати одні й ті самі звертання
+        # Кеш для швидких відповідей (простий лру кеш)
+        self.response_cache = {}
+        self.max_cache_size = 20
+
+    def update_conversation_context(self, user_text: str, jarvis_response: str):
+        """Оновлює контекст розмови для Jarvis-стилю"""
+        # Додаємо нову фразу, зберігаємо тільки останні 2
+        self.conversation_history.append(user_text)
+        if len(self.conversation_history) > 2:
+            self.conversation_history.pop(0)
+
+        self.last_responses.append(jarvis_response)
+        if len(self.last_responses) > 2:
+            self.last_responses.pop(0)
+
+    async def generate_jarvis_response_parallel(self, user_text: str, selected_plugins: list):
+        """ОНОВЛЕНИЙ МЕТОД: Генерує команди + Jarvis відповідь в одному запиті"""
+
+        # Тепер execute_plugin_commands повертає і команди, і jarvis відповідь
+        execution_plan, jarvis_response = await self.execute_plugin_commands(user_text, selected_plugins)
+
+        return jarvis_response, execution_plan
 
     async def select_plugins(self, user_text: str):
         """ЕТАП 1: GPT обирає потрібні плагіни для обробки команди."""
         try:
-            logger.info("Starting plugin selection", extra={'user_text': user_text})
-
             plugins_summary = self.plugin_manager.get_plugins_summary()
-            logger.info("Got plugins summary", extra={'plugins_count': len(plugins_summary)})
 
             plugins_list = []
             for i, plugin in enumerate(plugins_summary, 1):
                 try:
-                    plugin_desc = plugin['description']
+                    plugin_desc = plugin['name'] + ' - ' + plugin.get('description', '')  # Додаємо '' для уникнення KeyError, якщо 'description' відсутній
                     plugin_line = f"{i}. {plugin_desc}"
                     plugins_list.append(plugin_line)
                 except Exception as e:
@@ -66,17 +93,23 @@ class SmartAssistant:
 "прикольна відкрив мені Steam" → {{"isCommand": false}}
 "класно, спасибо" → {{"isCommand": false}}"""
 
+            # ОПТИМІЗАЦІЇ ШВИДКОСТІ GPT
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": "You are a smart assistant that analyzes user commands and selects appropriate plugins."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=150
+                max_tokens=150,
+                temperature=0.1,  # Низька температура для детермінованості
+                top_p=0.9,        # Обмежуємо вибір токенів
+                frequency_penalty=0,
+                presence_penalty=0,
+                timeout=10        # Таймаут 10 секунд
             )
 
             result_text = response.choices[0].message.content.strip()
-            logger.info(f"GPT plugin selection result: {result_text}")
+            print(f"GPT plugin selection result: {result_text}")
 
             if not result_text:
                 return {"success": False, "error": "Empty response from GPT"}
@@ -88,12 +121,10 @@ class SmartAssistant:
                 is_command = result.get("isCommand", True)  # За замовчуванням вважаємо командою (для сумісності)
 
                 if not is_command:
-                    logger.info("Detected casual talk, not a command")
                     return {"success": False, "error": "Not a command", "casual_talk": True}
 
                 # Якщо це команда - обробляємо як раніше
                 plugin_names = result.get("plugins", [])
-                logger.info(f"Parsed plugin names: {plugin_names}")
 
                 if plugin_names:
                     return {"success": True, "plugins": plugin_names}
@@ -148,64 +179,70 @@ class SmartAssistant:
 
         commands_text = '\n'.join(all_commands)
 
-        prompt = f"""Команда користувача: "{user_text}"
+        # Додаємо контекст попередніх команд
+        context_text = ""
+        if self.conversation_history:
+            context_text = f"\nПопередні команди користувача: {' | '.join(self.conversation_history)}"
+
+        # Додаємо інформацію про попередні відповіді Jarvis
+        if self.last_responses:
+            context_text += f"\nТвої попередні відповіді: {' | '.join(self.last_responses)}"
+
+        # Формуємо системний промпт (правила для JARVIS)
+        system_prompt = """Ти — JARVIS, високоінтелектуальний штучний інтелект. 
+Твоя задача: перетворити запит користувача на команди для системи та згенерувати коротку відповідь.
+
+ХАРАКТЕР ТА ТОН:
+- ЗАВЖДИ звертайся до користувача "сер".
+- Твій стиль: британський дворецький — елегантний, ввічливий, професійний.
+- ВАЖЛИВО: Твої відповіді мають бути ЖИВИМИ та РІЗНОМАНІТНИМИ. Аналізуй "Попередні відповіді" і НІКОЛИ не повторюй ту саму фразу.
+- Адаптуй відповідь під дію: якщо відкриваєш гру (GTA, Cyberpunk) — побажай приємного відпочинку; якщо відкриваєш IDE чи робочі програми — побажай продуктивної роботи.
+
+ПРАВИЛА ПАРАМЕТРІВ:
+- Гучність: "трішки тише" (~10-15%), "значно тише" (~30-50%).
+- Програми: витягуй точну офіційну назву ("стім" → "Steam").
+- Пошук: залишай лише ключові слова.
+- Якщо кілька програм: використовуй ключі open_program1, open_program2.
+
+ФОРМАТ ВІДПОВІДІ (строго JSON):
+{
+  "commands": {"назва_команди": "значення_параметра"},
+  "jarvis_response": "Твоя унікальна, жива відповідь на 4-10 слів, що закінчується на 'сер'."
+}"""
+
+        # Формуємо користувацький промпт (поточна ситуація)
+        user_prompt = f"""Користувач каже: "{user_text}"
 
 Доступні команди:
 {commands_text}
+{context_text}
 
-Проаналізуй команду і поверни JSON з потрібними командами + природною відповіддю для озвучування.
-
-ВАЖЛИВО:
-- Використовуй ТОЧНО ті програми що згадав користувач
-- Не додавай програми які користувач не просив
-- Якщо користувач каже "Steam discord", то тільки Steam та Discord
-- Додай природну відповідь українською як справжній Джарвіс
-
-ДЛЯ МНОЖИННИХ ПРОГРАМ використовуй нумеровані ключі:
-
-Приклади:
-"запусти Steam і зроби звук на 77%" -> {{
-  "commands": {{"open_program": "Steam", "set_volume": "77"}},
-  "response": "Добре, запускаю Steam і встановлюю гучність на 77 відсотків"
-}}
-
-"відкрий Steam discord" -> {{
-  "commands": {{"open_program1": "Steam", "open_program2": "Discord"}},
-  "response": "Окей, відкриваю Steam і Discord для вас"
-}}
-
-"знайди котиків на youtube" -> {{
-  "commands": {{"search_youtube": "котики"}},
-  "response": "Шукаю котиків на YouTube"
-}}
-
-"зроби тихіше на 20" -> {{
-  "commands": {{"volume_down": "20"}},
-  "response": "Зменшую гучність на 20 відсотків"
-}}
-
-Формат відповіді: {{"commands": {{"команда1": "параметр1"}}, "response": "природна відповідь українською"}}"""
+Проаналізуй запит, обери команди та згенеруй відповідь у форматі JSON."""
 
         try:
+            # ОПТИМІЗАЦІЇ ШВИДКОСТІ GPT
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a smart assistant that generates specific plugin commands. Extract exact parameter values from user text."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=200
+                response_format={"type": "json_object"}, # Гарантує валідний JSON
+                max_tokens=250,
+                temperature=0.7,  # Піднято з 0.2! Це дасть варіативність фраз
+                top_p=0.9,
+                frequency_penalty=0.5, # Штраф за повторення слів (робить мову багатшою)
+                presence_penalty=0.2,
+                timeout=12
             )
 
             result_text = response.choices[0].message.content.strip()
-            logger.info(f"Stage 2 AI response: '{result_text}'")
+            print(f"Stage 2 AI response: '{result_text}'")
 
+            # Тепер результат містить команди + jarvis відповідь
             parsed_result = json.loads(result_text)
-
-            # Отримуємо команди і відповідь від GPT
             commands_dict = parsed_result.get("commands", {})
-            natural_response = parsed_result.get("response", "")
-
-            logger.info(f"Natural response from AI: '{natural_response}'")
+            jarvis_response = parsed_result.get("jarvis_response", "Так, сер")
 
             # Групуємо команди за плагінами
             plugin_commands = {}
@@ -225,12 +262,11 @@ class SmartAssistant:
                 else:
                     logger.warning(f"Command {base_command} (from {command_name}) not found in any plugin")
 
-            # Створюємо execution_plan з природною відповіддю
+            # Створюємо execution_plan без природної відповіді
             for plugin_name, commands_list in plugin_commands.items():
                 execution_plan.append({
                     "plugin": plugin_name,
-                    "commands": commands_list,
-                    "natural_response": natural_response  # Додаємо природну відповідь
+                    "commands": commands_list
                 })
 
         except Exception as e:
@@ -257,7 +293,7 @@ class SmartAssistant:
                     'traceback': traceback.format_exc()
                     })
 
-        return execution_plan
+        return execution_plan, jarvis_response if 'jarvis_response' in locals() else "Помилка, сер"
 
 
 # Глобальний екземпляр (ініціалізується в main.py)
@@ -270,9 +306,7 @@ def initialize_smart_assistant(api_key):
     if api_key and api_key != "YOUR_OPENAI_API_KEY_HERE":
         try:
             smart_assistant = SmartAssistant(api_key)
-            logger.info("Smart AI assistant initialized successfully", extra={
-                'mode': 'AI_enabled'
-            })
+            logger.info("Smart AI assistant initialized successfully")
             return True
         except Exception as e:
             logger.error("Failed to initialize Smart AI assistant", extra={
@@ -281,10 +315,7 @@ def initialize_smart_assistant(api_key):
             smart_assistant = None
             return False
     else:
-        logger.info("OpenAI API key not provided", extra={
-            'mode': 'no_ai',
-            'status': 'AI assistant will not be available'
-        })
+        logger.info("OpenAI API key not provided - AI assistant will not be available")
         return False
 
 
@@ -303,18 +334,14 @@ async def process_smart_command(user_text):
 
         # Ініціалізуємо менеджер плагінів
         if not hasattr(smart_assistant, 'plugin_manager') or smart_assistant.plugin_manager is None:
-            logger.info("Initializing SmartPluginManager")
-            smart_assistant.plugin_manager = SmartPluginManager()
-            logger.info("SmartPluginManager initialized successfully")
+                smart_assistant.plugin_manager = SmartPluginManager()
 
         # ЕТАП 1: GPT обирає потрібні плагіни
         plugin_selection = await smart_assistant.select_plugins(user_text)
-        logger.info(f"Plugin selection result: {plugin_selection}")
 
         if not plugin_selection.get("success"):
             # Перевіряємо чи це звичайна розмова
             if plugin_selection.get("casual_talk"):
-                logger.info("User is having casual talk, not executing commands")
                 return {
                     "success": False,
                     "message": "Розмова розпізнана, команда не виконується",
@@ -329,14 +356,29 @@ async def process_smart_command(user_text):
 
         selected_plugins = plugin_selection.get("plugins", [])
 
-        # ЕТАП 2: GPT визначає команди для кожного плагіна
-        execution_plan = await smart_assistant.execute_plugin_commands(user_text, selected_plugins)
-        logger.info(f"Execution plan: {execution_plan}")
+        # НОВИЙ ПІДХІД: Паралельно генеруємо швидку відповідь та команди
+        quick_response, execution_plan = await smart_assistant.generate_jarvis_response_parallel(
+            user_text, selected_plugins
+        )
 
-        if not execution_plan:
+        # ГОТУЄМО відповідь заздалегідь але НЕ озвучуємо до успішного виконання
+        print(f"Quick Jarvis response prepared: {quick_response}")
+
+        # Завантажуємо конфігурацію для TTS
+        try:
+            import config_manager as cfg
+            config = cfg.load_config()
+        except Exception as config_error:
+            print(f"Config load error: {config_error}")
+            config = {}
+
+        # Перевіряємо чи вдалося створити план виконання
+        if isinstance(execution_plan, Exception) or not execution_plan:
+            logger.warning(f"Execution plan failed: {execution_plan}")
             return {
                 "success": False,
-                "message": "Не вдалося створити план виконання"
+                "message": "Не вдалося створити план виконання",
+                "quick_response": quick_response
             }
 
         # ЕТАП 3: Виконуємо команди
@@ -345,12 +387,10 @@ async def process_smart_command(user_text):
         for plugin_info in execution_plan:
             plugin_name = plugin_info.get("plugin")
             command_sequence = plugin_info.get("commands", [])
-            logger.info(f"Executing plugin: {plugin_name}, commands: {command_sequence}")
 
             for command_info in command_sequence:
                 command_name = command_info.get("command")
                 params = command_info.get("params", {})
-                logger.info(f"Executing command: {command_name} with params: {params}")
 
                 result = await smart_assistant.plugin_manager.execute_plugin_command(
                     plugin_name, command_name, **params
@@ -369,30 +409,29 @@ async def process_smart_command(user_text):
         successful_commands = [r for r in execution_results if r["result"].get("success")]
 
         if successful_commands:
-            # Використовуємо природну відповідь від AI замість технічних повідомлень
-            natural_response = ""
+            # Оновлюємо контекст розмови для наступних запитів
+            smart_assistant.update_conversation_context(user_text, quick_response)
 
-            # Шукаємо природну відповідь в execution_plan
-            for plugin_info in execution_plan:
-                if plugin_info.get("natural_response"):
-                    natural_response = plugin_info.get("natural_response")
-                    break
-
-            # Якщо немає природної відповіді, використовуємо технічні повідомлення
-            if not natural_response:
-                success_messages = [r["result"].get("message", "OK") for r in successful_commands]
-                final_message = "; ".join(success_messages)
-            else:
-                final_message = natural_response
-                logger.info(f"Using natural AI response: {natural_response}")
-
-            # Голосова відповідь при успішному виконанні
+            # ТЕПЕР озвучуємо готову відповідь після успішного виконання
+            print(f"Command successful - playing Jarvis response: {quick_response}")
+            tts_task = None
             try:
-                import config_manager as cfg
-                config = cfg.load_config()
-                speak_text(final_message, config)
+                # НЕГАЙНО запускаємо TTS з готовою відповіддю
+                tts_task = asyncio.create_task(asyncio.to_thread(speak_text, quick_response, config))
             except Exception as tts_error:
-                logger.debug(f"TTS error: {tts_error}")
+                print(f"Success TTS error: {tts_error}")
+
+            # Формуємо фінальну відповідь
+            final_message = f"Команда виконана"
+
+            # Чекаємо завершення TTS перед поверненням (уникаємо самопрослуховування)
+            if tts_task and not tts_task.done():
+                try:
+                    await tts_task
+                    # Невелика пауза після завершення TTS
+                    await asyncio.sleep(0.5)
+                except Exception:
+                    pass
 
             return {
                 "success": True,
@@ -402,18 +441,18 @@ async def process_smart_command(user_text):
                     "successful_count": len(successful_commands),
                     "total_count": len(execution_results)
                 },
-                "message": final_message
+                "message": final_message,
+                "quick_response": quick_response  # Повертаємо швидку відповідь для логування
             }
         else:
             final_message = "Жодна команда не виконалася успішно"
 
-            # Голосова відповідь при неуспішному виконанні
+            # Голосова відповідь при неуспішному виконанні (використовуємо вже завантажений config)
+            print(f"Command failed - playing error message")
             try:
-                import config_manager as cfg
-                config = cfg.load_config()
-                speak_text("Команду не вдалося виконати", config)
+                speak_text("Вибачте, команду не вдалося виконати, сер", config)
             except Exception as tts_error:
-                logger.debug(f"TTS error: {tts_error}")
+                print(f"Error TTS failed: {tts_error}")
 
             return {
                 "success": False,

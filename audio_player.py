@@ -2,16 +2,11 @@
 import os
 import sys
 import winsound
-import win32com.client
 from logger_config import get_logger
-import requests
 import pygame
-import io
-from urllib.parse import quote
-import asyncio
-import edge_tts
 import subprocess
 import tempfile
+import edge_tts
 
 logger = get_logger('audio_player')
 
@@ -115,240 +110,15 @@ class EdgeTTS:
 
 
 
-class ElevenLabsTTS:
-    """Клас для роботи з ElevenLabs TTS (преміум якість)"""
-
-    def __init__(self, api_key=None):
-        self.api_key = api_key
-        self.base_url = "https://api.elevenlabs.io/v1/text-to-speech"
-        # Jarvis-подібний голос ID (треба буде налаштувати)
-        self.voice_id = "21m00Tcm4TlvDq8ikWAM"  # Rachel (англійська)
-        pygame.mixer.init()
-
-    def speak(self, text, voice_id=None):
-        """Озвучує текст через ElevenLabs"""
-        if not self.api_key:
-            logger.warning("ElevenLabs API key not provided")
-            return False
-
-        try:
-            voice_id = voice_id or self.voice_id
-            url = f"{self.base_url}/{voice_id}"
-
-            headers = {
-                "Accept": "audio/mpeg",
-                "Content-Type": "application/json",
-                "xi-api-key": self.api_key
-            }
-
-            data = {
-                "text": text,
-                "model_id": "eleven_monolingual_v1",
-                "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.5,
-                    "style": 0.5,
-                    "use_speaker_boost": True
-                }
-            }
-
-            response = requests.post(url, json=data, headers=headers, timeout=10)
-
-            if response.status_code == 200:
-                # Відтворюємо через pygame
-                audio_data = io.BytesIO(response.content)
-                pygame.mixer.music.load(audio_data)
-                pygame.mixer.music.play()
-
-                while pygame.mixer.music.get_busy():
-                    pygame.time.wait(100)
-
-                logger.debug(f"ElevenLabs TTS played: {text[:50]}...")
-                return True
-            else:
-                logger.error(f"ElevenLabs failed: {response.status_code}")
-                return False
-
-        except Exception as e:
-            logger.error(f"ElevenLabs TTS error: {e}")
-            return False
-
-class GoogleTTS:
-    """Клас для роботи з Google Text-to-Speech"""
-
-    def __init__(self):
-        pygame.mixer.init()
-        self.base_url = "https://translate.google.com/translate_tts"
-
-    def speak(self, text, language="uk", slow=False, try_male=True):
-        """Озвучує текст через Google TTS"""
-        try:
-            if not text.strip():
-                return False
-
-            # Спробуємо різні варіанти для отримання чоловічого українського голосу
-            voice_attempts = [
-                {
-                    'ie': 'UTF-8',
-                    'q': text,
-                    'tl': language,
-                    'client': 'tw-ob',
-                    'ttsspeed': 0.8,
-                    'idx': 0,  # Перший голос (часто чоловічий)
-                },
-                {
-                    'ie': 'UTF-8',
-                    'q': text,
-                    'tl': language,
-                    'client': 'gtx',  # Альтернативний клієнт
-                    'ttsspeed': 0.8,
-                },
-                {
-                    'ie': 'UTF-8',
-                    'q': text,
-                    'tl': language,
-                    'client': 'tw-ob',
-                    'ttsspeed': 0.8,
-                    'tk': '1',  # Додатковий параметр
-                }
-            ]
-
-            # Пробуємо кожен варіант
-            for attempt_num, params in enumerate(voice_attempts):
-                try:
-                    response = self._make_tts_request(params)
-                    if response:
-                        logger.info(f"Ukrainian TTS success with attempt #{attempt_num + 1}")
-                        return response
-                except Exception as e:
-                    logger.debug(f"TTS attempt #{attempt_num + 1} failed: {e}")
-                    continue
-
-            return False
-
-        except Exception as e:
-            logger.error(f"Google TTS error: {e}")
-            return False
-
-    def _make_tts_request(self, params):
-        """Допоміжна функція для TTS запиту"""
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-
-        response = requests.get(self.base_url, params=params, headers=headers, timeout=5)
-
-        if response.status_code == 200:
-            # Відтворюємо аудіо через pygame
-            audio_data = io.BytesIO(response.content)
-            pygame.mixer.music.load(audio_data)
-            pygame.mixer.music.play()
-
-            # Чекаємо поки закінчиться відтворення
-            while pygame.mixer.music.get_busy():
-                pygame.time.wait(100)
-
-            return True
-
-        return False
-
 class TTSManager:
-    """Менеджер для текстового мовлення (TTS)"""
+    """Менеджер для текстового мовлення (TTS) з використанням Edge TTS"""
 
     def __init__(self):
-        self.engine = None
-        self.voices = {}
-        self._initialize_engine()
+        self.edge_tts = EdgeTTS()
 
-    def _initialize_engine(self):
-        """Ініціалізація TTS движка Windows SAPI"""
-        try:
-            self.engine = win32com.client.Dispatch("SAPI.SpVoice")
-
-            # Завантажуємо доступні голоси
-            voices = self.engine.GetVoices()
-            for i in range(voices.Count):
-                voice = voices.Item(i)
-                voice_name = voice.GetDescription()
-                self.voices[voice_name.lower()] = i
-                logger.info(f"Available voice: {voice_name}")  # Змінено на INFO щоб бачити в логах
-
-            # Налаштовуємо параметри за замовчуванням для більш живого звучання
-            self.engine.Rate = 1  # Трохи швидше для більш живого звучання
-            self.engine.Volume = 85  # Трохи тихіше щоб не кричало
-
-            logger.info("TTS engine initialized successfully")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize TTS engine: {e}")
-            self.engine = None
-
-    def set_voice(self, voice_type="jarvis"):
-        """Встановлює голос на основі типу"""
-        if not self.engine:
-            return False
-
-        try:
-            # Пошук голосу для Jarvis-подібного звучання
-            preferred_voices = []
-
-            if voice_type.lower() == "jarvis":
-                # Шукаємо українські/російські голоси у порядку пріоритету
-                preferred_voices = [
-                    "microsoft ostap",     # Український чоловічий (якщо встановлений)
-                    "ostap",
-                    "microsoft natalia",   # Українська жіноча (якщо встановлена)
-                    "natalia",
-                    "microsoft pavel",     # Російський чоловічий
-                    "pavel",
-                    "microsoft irina",     # Російська жіноча
-                    "irina",
-                    "microsoft katya",     # Російська жіноча
-                    "katya",
-                    "microsoft david",     # Англійський як останній варіант
-                    "david"
-                ]
-
-            # Шукаємо найбільш підходящий голос
-            for preferred in preferred_voices:
-                for voice_name, voice_index in self.voices.items():
-                    if preferred in voice_name.lower():
-                        voices = self.engine.GetVoices()
-                        self.engine.Voice = voices.Item(voice_index)
-                        logger.info(f"Voice set to: {voice_name}")
-                        return True
-
-            # Якщо не знайшли, використовуємо перший доступний
-            if self.voices:
-                voices = self.engine.GetVoices()
-                self.engine.Voice = voices.Item(0)
-                first_voice = list(self.voices.keys())[0]
-                logger.info(f"Using fallback voice: {first_voice}")
-                return True
-
-        except Exception as e:
-            logger.error(f"Failed to set voice: {e}")
-
-        return False
-
-    def set_speed(self, speed=0):
-        """Встановлює швидкість мовлення (-10 до 10)"""
-        if not self.engine:
-            return False
-
-        try:
-            # Обмежуємо швидкість в допустимих межах
-            speed = max(-10, min(10, speed))
-            self.engine.Rate = speed
-            logger.debug(f"TTS speed set to: {speed}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to set TTS speed: {e}")
-            return False
-
-    def speak(self, text, async_mode=True):
-        """Промовляє текст"""
-        if not self.engine or not text:
+    def speak(self, text, voice_type="jarvis", rate="+10%"):
+        """Промовляє текст через Edge TTS"""
+        if not text:
             return False
 
         try:
@@ -358,12 +128,8 @@ class TTSManager:
             if not clean_text:
                 return False
 
-            # Режим синхронний (0) або асинхронний (1)
-            flags = 1 if async_mode else 0
-
             logger.debug(f"Speaking: {clean_text[:50]}...")
-            self.engine.Speak(clean_text, flags)
-            return True
+            return self.edge_tts.speak(clean_text, voice_type=voice_type, rate=rate)
 
         except Exception as e:
             logger.error(f"Failed to speak text: {e}")
@@ -371,20 +137,18 @@ class TTSManager:
 
     def is_available(self):
         """Перевіряє чи доступний TTS движок"""
-        return self.engine is not None
+        return True  # Edge TTS завжди доступний
 
     def stop(self):
         """Зупиняє поточне мовлення"""
-        if self.engine:
-            try:
-                self.engine.Skip("Sentence", 999999)
-                logger.debug("TTS stopped")
-            except Exception as e:
-                logger.error(f"Failed to stop TTS: {e}")
+        try:
+            pygame.mixer.music.stop()
+            logger.debug("TTS stopped")
+        except Exception as e:
+            logger.error(f"Failed to stop TTS: {e}")
 
 # Глобальні екземпляри TTS
 _tts_manager = None
-_google_tts = None
 _edge_tts = None
 
 def get_tts_manager():
@@ -393,13 +157,6 @@ def get_tts_manager():
     if _tts_manager is None:
         _tts_manager = TTSManager()
     return _tts_manager
-
-def get_google_tts():
-    """Отримує глобальний екземпляр Google TTS"""
-    global _google_tts
-    if _google_tts is None:
-        _google_tts = GoogleTTS()
-    return _google_tts
 
 def get_edge_tts():
     """Отримує глобальний екземпляр Edge TTS"""
@@ -427,7 +184,7 @@ def get_voice_by_wake_word(config):
         return config.get("ttsVoice", "jarvis")
 
 def speak_text(text, config=None):
-    """Швидка функція для мовлення тексту з конфігурацією"""
+    """Швидка функція для мовлення тексту з конфігурацією через Edge TTS"""
     if not config:
         return False
 
@@ -435,44 +192,48 @@ def speak_text(text, config=None):
     if not config.get("ttsEnabled", False):
         return False
 
-    # Вибираємо TTS движок
-    tts_engine = config.get("ttsEngine", "edge")  # edge, google, windows
+    # Використовуємо Edge TTS (найкращий для української)
+    edge_tts = get_edge_tts()
 
-    if tts_engine == "edge":
-        # Використовуємо Edge TTS (найкращий для української)
-        edge_tts = get_edge_tts()
+    # Автоматично вибираємо голос за wake word
+    voice_type = get_voice_by_wake_word(config)
 
-        # Автоматично вибираємо голос за wake word
-        voice_type = get_voice_by_wake_word(config)
+    # Швидкість мовлення
+    rate = config.get("ttsRate", "+10%")
 
-        # Швидкість мовлення
-        rate = config.get("ttsRate", "+10%")
+    logger.info(f"Using Edge TTS for: '{text[:50]}...' with voice: {voice_type}, rate: {rate}")
+    return edge_tts.speak(text, voice_type=voice_type, rate=rate)
 
-        logger.info(f"Using Edge TTS for: '{text[:50]}...' with voice: {voice_type}, rate: {rate}")
-        return edge_tts.speak(text, voice_type=voice_type, rate=rate)
 
-    elif tts_engine == "google":
-        # Використовуємо Google TTS
-        google_tts = get_google_tts()
-        language = config.get("ttsLanguage", "uk")
-        slow_speech = config.get("ttsSpeed", 1) < 1
+def play_jarvis_greeting(config):
+    """Програє Jarvis вітальну фразу замість звуку при ttsEnabled: true"""
+    import random
 
-        logger.info(f"Using Google TTS for: '{text[:50]}...' in language: {language}")
-        return google_tts.speak(text, language=language, slow=slow_speech)
+    greetings = [
+        "Так, сер",
+        "Я вас слухаю, сер",
+        "На вашу послугу, сер",
+        "Слухаю вас, сер",
+        "Як завжди, сер"
+    ]
 
+    greeting = random.choice(greetings)
+    speak_text(greeting, config)
+
+
+def handle_wake_word_response(config):
+    """Розумно обирає звук або TTS залежно від налаштувань"""
+    if config.get("ttsEnabled", False):
+        # Якщо TTS увімкнений - говорити Jarvis фразу
+        play_jarvis_greeting(config)
     else:
-        # Використовуємо Windows SAPI
-        tts = get_tts_manager()
-        if not tts.is_available():
-            logger.warning("Windows TTS engine not available, fallback to Edge TTS")
-            edge_tts = get_edge_tts()
-            return edge_tts.speak(text, voice_type="jarvis")
+        # Якщо TTS вимкнений - грати звук
+        play_listen_sound()
 
-        # Налаштовуємо голос і швидкість
-        voice_type = config.get("ttsVoice", "jarvis")
-        speed = config.get("ttsSpeed", 0)
 
-        tts.set_voice(voice_type)
-        tts.set_speed(speed)
-
-        return tts.speak(text)
+def handle_session_end(config):
+    """Обробляє завершення сесії - тільки звук якщо TTS вимкнений"""
+    if not config.get("ttsEnabled", False):
+        # Звук тільки якщо TTS вимкнений
+        play_end_sound()
+    # Якщо TTS увімкнений - тиша при завершенні

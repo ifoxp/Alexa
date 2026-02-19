@@ -4,13 +4,10 @@ pvporcupine
 # Online Speech-to-Text engine
 SpeechRecognition
 
-# Async support
-asyncio
-
 # Retry mechanism
 tenacity
 
-# AI Assistant (GPT-5 nano)
+# AI Assistant (OpenAI API)
 openai
 
 # System monitoring
@@ -19,8 +16,11 @@ psutil
 # Audio I/O & Data
 pyaudio
 
-# Command matching (python-Levenshtein автоматично встановлюється)
-thefuzz
+# Audio playback
+pygame
+
+# Text-to-speech
+edge-tts
 
 # System Control (volume & media)
 pycaw
