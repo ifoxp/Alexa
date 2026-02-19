@@ -191,6 +191,14 @@ class WindowsProgramsPlugin(SmartPlugin):
             # Розширюємо змінні середовища
             expanded_path = os.path.expandvars(path)
 
+            # === ЛОГІКА ДЛЯ ЗАПУСКУ MS STORE ДОДАТКІВ ===
+            if expanded_path.startswith("shell:AppsFolder"):
+                launch_cmd = f'explorer.exe {expanded_path}'
+                subprocess.Popen(launch_cmd, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                self.log_info(f"Launched MS Store App: {expanded_path}")
+                return True
+            # ============================================
+
             # Якщо це URL - відкриваємо в браузері
             if expanded_path.startswith(('http://', 'https://')):
                 webbrowser.open(expanded_path)
@@ -214,14 +222,12 @@ class WindowsProgramsPlugin(SmartPlugin):
                 exe_path = parts[0]
                 args = parts[1]
                 if os.path.exists(exe_path) or exe_path in ['calc.exe', 'notepad.exe', 'mspaint.exe', 'explorer.exe']:
-                    # Використовуємо CREATE_NO_WINDOW щоб не показувати консоль
                     subprocess.Popen(f'"{exe_path}" {args}', shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
                     self.log_info(f"Launched with args: {exe_path}")
                     return True
 
             # Звичайні exe файли та системні команди
             if os.path.exists(expanded_path) or expanded_path in ['calc.exe', 'notepad.exe', 'mspaint.exe', 'explorer.exe']:
-                # Використовуємо CREATE_NO_WINDOW щоб не показувати консоль
                 subprocess.Popen([expanded_path], creationflags=subprocess.CREATE_NO_WINDOW)
                 self.log_info(f"Launched directly: {expanded_path}")
                 return True
@@ -349,39 +355,59 @@ class WindowsProgramsPlugin(SmartPlugin):
         }
 
     async def _search_via_powershell(self, query: str) -> List[Dict[str, Any]]:
-        """Пошук програми через PowerShell Get-StartApps"""
+        """Пошук програми через PowerShell (спеціально для MS Store додатків)"""
         matches = []
         try:
-            ps_command = f"Get-StartApps | Where-Object {{$_.Name -like '*{query}*'}} | Select-Object Name, AppID | ConvertTo-Json"
-
+            print(f"[POWERSHELL_SEARCH] Looking for Store apps matching: '{query}'")
+            ps_command = 'Get-StartApps | Select-Object Name, AppID | ConvertTo-Json -Compress'
+            
             result = subprocess.run(
                 ["powershell", "-Command", ps_command],
-                capture_output=True, text=True, timeout=10
+                capture_output=True, check=True
             )
+            
+            # Безпечне розкодування (кирилиця/латиниця)
+            try:
+                output = result.stdout.decode('cp1251')
+            except UnicodeDecodeError:
+                output = result.stdout.decode('utf-8', errors='ignore')
 
-            if result.returncode == 0 and result.stdout.strip():
-                import json
-                apps_data = json.loads(result.stdout)
-                if isinstance(apps_data, dict):
-                    apps_data = [apps_data]
+            if not output.strip():
+                return matches
 
-                for app in apps_data:
-                    name = app.get('Name', '')
-                    app_id = app.get('AppID', '')
-                    if name and app_id:
-                        matches.append({
-                            "name": name,
-                            "path": app_id,
-                            "match_type": "powershell"
-                        })
+            apps = json.loads(output)
+            # Якщо повернувся один об'єкт, а не список
+            if isinstance(apps, dict):
+                apps = [apps]
+
+            for app in apps:
+                name = app.get('Name', '')
+                app_id = app.get('AppID', '')
+                
+                # Порівнюємо в нижньому регістрі
+                if query.lower() in name.lower():
+                    # Визначаємо пріоритет для сортування
+                    priority = 0
+                    if name.lower() == query.lower(): priority = 10
+                    elif name.lower().startswith(query.lower()): priority = 5
+                    else: priority = 2
+
+                    matches.append({
+                        "name": name,
+                        "path": f"shell:AppsFolder\\{app_id}", # Спеціальний шлях!
+                        "priority": priority
+                    })
+                    print(f"[POWERSHELL_SEARCH] Found: {name} -> {app_id}")
+                    
         except Exception as e:
             self.log_error(f"PowerShell search failed for {query}", error=str(e))
+            print(f"[POWERSHELL_SEARCH] Error: {e}")
 
         return matches
 
 
     async def _universal_launcher(self, program_query: str) -> Dict[str, Any]:
-        """Universal launcher - шукає програми через ярлики Start Menu."""
+        """Universal launcher - шукає програми через ярлики Start Menu та MS Store."""
         query = program_query.lower().strip()
 
         print(f"[UNIVERSAL_LAUNCHER] Starting search for: '{query}'")
@@ -389,7 +415,7 @@ class WindowsProgramsPlugin(SmartPlugin):
         # 1. Складаємо список усіх місць, де можуть бути ярлики
         search_dirs = [
             os.path.join(os.environ['AppData'], r'Microsoft\Windows\Start Menu\Programs'),
-            os.path.join(os.environ['ProgramData'], r'Microsoft\Windows\Start Menu\Programs'),
+            os.path.join(os.environ.get('ProgramData', 'C:\\ProgramData'), r'Microsoft\Windows\Start Menu\Programs'),
             os.path.join(os.environ['USERPROFILE'], 'Desktop'),
             os.path.join(os.environ['USERPROFILE'], 'OneDrive', 'Desktop')
         ]
@@ -408,7 +434,6 @@ class WindowsProgramsPlugin(SmartPlugin):
                         full_path = os.path.join(root, f)
                         name = f.replace('.lnk', '').replace('.exe', '')
 
-                        # Пріоритет: чим ближче назва до запиту, тим вище в списку
                         priority = 0
                         if name.lower() == query: priority = 10
                         elif name.lower().startswith(query): priority = 5
@@ -419,6 +444,12 @@ class WindowsProgramsPlugin(SmartPlugin):
                             "path": full_path,
                             "priority": priority
                         })
+
+        # === ДОДАЄМО ПОШУК MS STORE ДОДАТКІВ ===
+        print(f"[UNIVERSAL_LAUNCHER] Scanning MS Store applications...")
+        store_candidates = await self._search_via_powershell(query)
+        candidates.extend(store_candidates)
+        # =======================================
 
         # 3. Сортуємо: спочатку найвищий пріоритет
         candidates = sorted(candidates, key=lambda x: x['priority'], reverse=True)
