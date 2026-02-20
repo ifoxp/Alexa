@@ -8,25 +8,25 @@ from audio_player import speak_text
 logger = get_logger('smart_ai')
 
 class SmartAssistant:
-    def __init__(self, api_key, model="gpt-4o-mini"):
+    def __init__(self, api_key, model="gpt-4.1-mini"): 
         self.client = AsyncOpenAI(
             api_key=api_key,
-            timeout=15.0,  # Глобальний таймаут для всіх запитів
-            max_retries=2   # Максимум 2 спроби
+            timeout=15.0,
+            max_retries=2
         )
         self.model = model
         self.plugin_manager = None
-        # Контекст для Jarvis-стилю
-        self.conversation_history = []  # Останні 2 фрази користувача
-        self.last_responses = []  # Останні 2 відповіді Jarvis
-        self.used_greetings = set()  # Щоб не повторювати одні й ті самі звертання
+        self.conversation_history = []
+        self.last_responses = []
+        self.last_active_plugins = [] # Пам'ять для контексту
+        self.used_greetings = set()
         # Кеш для швидких відповідей (простий лру кеш)
         self.response_cache = {}
         self.max_cache_size = 20
 
-    def update_conversation_context(self, user_text: str, jarvis_response: str):
+    def update_conversation_context(self, user_text: str, jarvis_response: str, executed_plugins: list = None):
         """Оновлює контекст розмови для Jarvis-стилю"""
-        # Додаємо нову фразу, зберігаємо тільки останні 2
+        # Зберігаємо історію фраз
         self.conversation_history.append(user_text)
         if len(self.conversation_history) > 2:
             self.conversation_history.pop(0)
@@ -34,6 +34,12 @@ class SmartAssistant:
         self.last_responses.append(jarvis_response)
         if len(self.last_responses) > 2:
             self.last_responses.pop(0)
+            
+        # ОНОВЛЮЄМО ПАМ'ЯТЬ ПЛАГІНІВ (Важливо для 'зроби тихіше')
+        if executed_plugins:
+            self.last_active_plugins = executed_plugins
+            logger.info(f"Context updated with plugins: {executed_plugins}")
+        
 
     async def generate_jarvis_response_parallel(self, user_text: str, selected_plugins: list):
         """ОНОВЛЕНИЙ МЕТОД: Генерує команди + Jarvis відповідь в одному запиті"""
@@ -58,54 +64,43 @@ class SmartAssistant:
                     logger.error(f"Error processing plugin: {e}")
 
             plugins_text = '\n'.join(plugins_list)
+           
+            # Додаємо жорстку підказку про контекст, якщо він є
+            context_hint = ""
+            if self.conversation_history and getattr(self, 'last_active_plugins', None):
+                context_hint = f"\nКОНТЕКСТ ПОПЕРЕДНЬОЇ ДІЇ:\nМинула команда: '{self.conversation_history[-1]}'\nВикористані плагіни: {self.last_active_plugins}\nЯкщо поточний запит є продовженням минулого (наприклад 'тихіше', 'гучніше', 'ще', 'наступний'), ОБОВ'ЯЗКОВО поверни ці ж самі плагіни!\n"
 
-            prompt = f"""Ти розумний голосовий асистент. Користувач каже: "{user_text}"
+            prompt = f"""Ти — ядро маршрутизації голосового асистента. Твоє завдання — проаналізувати репліку і вирішити, чи це команда для виконання, чи просто звичайна розмова.
 
-ДОСТУПНІ ПЛАГІНИ:
+Користувач каже: "{user_text}"
+{context_hint}
+ДОСТУПНІ ПЛАГІНИ ТА ЇХНІ ОПИСИ:
 {plugins_text}
 
-ВАЖЛИВО: Спочатку визнач - це КОМАНДА чи просто РОЗМОВА?
-
-КОМАНДИ (потребують виконання):
-- "відкрий Steam"
-- "знайди котиків на ютубі"
-- "зроби звук тихіше"
-- "запусти телеграм"
-
-НЕ КОМАНДИ (звичайна розмова):
-- "прикольна відкрив мені Steam"
-- "класно, спасибо"
-- "це що, круто"
-- "ну даже покруче"
-- "зрозумів проблему?"
-
-Якщо це НЕ команда - поверни {{"isCommand": false}}
-Якщо це команда - поверни плагіни для виконання.
+ЛОГІКА ПРИЙНЯТТЯ РІШЕНЬ (Думай крок за кроком):
+1. Проаналізуй суть репліки користувача. Що він хоче?
+2. Прочитай описи доступних плагінів. Чи перетинається намір користувача з функціоналом хоча б одного з них?
+3. Якщо намір користувача відповідає зоні відповідальності певного плагіна (навіть якщо репліка обірвана, наприклад, містить слово "Spotify", "відкрий", "знайди", "тихіше") — це КОМАНДА (isCommand: true).
+4. Якщо репліка є просто реакцією ("класно", "дякую"), роздумами вголос, або не має жодного відношення до описаного функціоналу плагінів — це ЗВИЧАЙНА РОЗМОВА (isCommand: false).
 
 ФОРМАТ ВІДПОВІДІ (тільки JSON):
-{{"isCommand": true, "success": true, "plugins": ["назва_плагіна1"], "confidence": 0.95}}
-АБО
+{{"isCommand": true, "success": true, "plugins": ["назва_плагіна_з_переліку"], "confidence": 0.95}}
+АБО (якщо це звичайна розмова, яка не потребує плагінів)
 {{"isCommand": false}}
 
-ПРИКЛАДИ:
-"запусти телеграм" → {{"isCommand": true, "success": true, "plugins": ["windows_programs"], "confidence": 0.95}}
-"знайди котиків на ютубі" → {{"isCommand": true, "success": true, "plugins": ["browser_search"], "confidence": 0.90}}
-"прикольна відкрив мені Steam" → {{"isCommand": false}}
-"класно, спасибо" → {{"isCommand": false}}"""
+Видай лише валідний JSON без додаткових пояснень."""
 
-            # ОПТИМІЗАЦІЇ ШВИДКОСТІ GPT
+            # ОПТИМІЗОВАНИЙ ВИКЛИК ЕТАПУ 1
             response = await self.client.chat.completions.create(
-                model=self.model,
+                model="gpt-4.1-nano", 
                 messages=[
-                    {"role": "system", "content": "You are a smart assistant that analyzes user commands and selects appropriate plugins."},
+                    {"role": "system", "content": "You are a smart command router. You must always respond in JSON format."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=150,
-                temperature=0.1,  # Низька температура для детермінованості
-                top_p=0.9,        # Обмежуємо вибір токенів
-                frequency_penalty=0,
-                presence_penalty=0,
-                timeout=10        # Таймаут 10 секунд
+                response_format={"type": "json_object"},
+                max_completion_tokens=200, # Параметр для 4.1 серії
+                temperature=0.1,
+                timeout=10
             )
 
             result_text = response.choices[0].message.content.strip()
@@ -203,7 +198,8 @@ class SmartAssistant:
 - Програми: витягуй точну офіційну назву ("стім" → "Steam").
 - Пошук: залишай лише ключові слова.
 - Якщо кілька програм: використовуй ключі open_program1, open_program2.
-
+ВАЖЛИВО: Ключ 'commands' має бути ПЛОСКИМ об'єктом, де ключ — назва команди, а значення — її параметр.
+Приклад: {"open_program": "Steam", "set_volume": 20}
 ФОРМАТ ВІДПОВІДІ (строго JSON):
 {
   "commands": {"назва_команди": "значення_параметра"},
@@ -220,19 +216,16 @@ class SmartAssistant:
 Проаналізуй запит, обери команди та згенеруй відповідь у форматі JSON."""
 
         try:
-            # ОПТИМІЗАЦІЇ ШВИДКОСТІ GPT
+            # ОПТИМІЗАЦІЯ ДЛЯ ЕТАПУ 2 (GPT-5 NANO)
             response = await self.client.chat.completions.create(
-                model=self.model,
+                model="gpt-4.1-mini", 
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format={"type": "json_object"}, # Гарантує валідний JSON
-                max_tokens=250,
-                temperature=0.7,  # Піднято з 0.2! Це дасть варіативність фраз
-                top_p=0.9,
-                frequency_penalty=0.5, # Штраф за повторення слів (робить мову багатшою)
-                presence_penalty=0.2,
+                response_format={"type": "json_object"},
+                max_completion_tokens=400,
+                temperature=0.7,
                 timeout=12
             )
 
@@ -409,15 +402,25 @@ async def process_smart_command(user_text):
         successful_commands = [r for r in execution_results if r["result"].get("success")]
 
         if successful_commands:
-            # Оновлюємо контекст розмови для наступних запитів
-            smart_assistant.update_conversation_context(user_text, quick_response)
+            # Оновлюємо контекст розмови ТА ПЕРЕДАЄМО ПЛАГІНИ
+            smart_assistant.update_conversation_context(user_text, quick_response, selected_plugins)
 
-            # ТЕПЕР озвучуємо готову відповідь після успішного виконання
-            print(f"Command successful - playing Jarvis response: {quick_response}")
+            # Перевіряємо, чи плагін має власний текст для озвучування
+            plugin_speak_text = None
+            for result in successful_commands:
+                plugin_result = result.get("result", {})
+                if "speak_text" in plugin_result:
+                    plugin_speak_text = plugin_result["speak_text"]
+                    break
+
+            # Вибираємо що озвучувати: відповідь плагіна або стандартну відповідь Jarvis
+            text_to_speak = plugin_speak_text if plugin_speak_text else quick_response
+
+            print(f"Command successful - playing response: {text_to_speak}")
             tts_task = None
             try:
-                # НЕГАЙНО запускаємо TTS з готовою відповіддю
-                tts_task = asyncio.create_task(asyncio.to_thread(speak_text, quick_response, config))
+                # Запускаємо TTS з обраним текстом
+                tts_task = asyncio.create_task(asyncio.to_thread(speak_text, text_to_speak, config))
             except Exception as tts_error:
                 print(f"Success TTS error: {tts_error}")
 

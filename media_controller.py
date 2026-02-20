@@ -1,89 +1,81 @@
-# media_controller.py
-from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
-import keyboard
-import time
+import asyncio
+from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager
 
 class MediaStateManager:
-    """Керує станом аудіо-сесій, щоб розумно ставити на паузу."""
+    """Керує станом аудіо-сесій за допомогою сучасного Windows Media API."""
 
     def __init__(self):
-        # Тут ми будемо зберігати процеси, які ми поставили на паузу
-        self.paused_by_assistant = set()
+        # Прапорець, який показує, чи ми особисто зупинили музику
+        self.was_paused_by_assistant = False
 
-    def _is_session_audible(self, session):
-        """Перевіряє, чи сесія зараз відтворює звук."""
+    async def _get_media_session(self):
+        """Отримує поточну активну медіа-сесію (Spotify, YouTube, браузер тощо)"""
         try:
-            # Перевіряємо, чи сесія не зам'ючена і має гучність > 0
-            volume = session.SimpleAudioVolume
-            if volume.GetMute() == 1 or volume.GetMasterVolume() == 0:
-                return False
-            
-            # session.State == 1 означає, що сесія активна (відтворює звук)
-            if session.State == 1:
+            manager = await GlobalSystemMediaTransportControlsSessionManager.request_async()
+            return manager.get_current_session()
+        except Exception as e:
+            print(f"[MEDIA] Помилка отримання медіа-сесії: {e}")
+            return None
+
+    async def _pause_async(self):
+        """Асинхронна логіка точної паузи."""
+        self.was_paused_by_assistant = False
+        session = await self._get_media_session()
+        
+        if session:
+            info = session.get_playback_info()
+            # 4 означає Playing (грає), 5 означає Paused (на паузі)
+            if info and info.playback_status == 4:
+                print("[MEDIA] Знайдено активне відтворення. Ставлю чітко на паузу...")
+                # Відправляємо конкретно сигнал ПАУЗИ, а не перемикач
+                await session.try_pause_async()
+                self.was_paused_by_assistant = True
                 return True
-        except Exception:
-            # Якщо сесія закрилася під час перевірки, ігноруємо
-            return False
+                
+        print("[MEDIA] Музика не грає (або вже на паузі). Залишаю як є.")
         return False
+
+    async def _resume_async(self):
+        """Асинхронна логіка точного відновлення відтворення."""
+        if not self.was_paused_by_assistant:
+            print("[MEDIA] Відновлення скасовано: асистент не зупиняв музику.")
+            return
+
+        session = await self._get_media_session()
+        if session:
+            info = session.get_playback_info()
+            # 5 означає Paused
+            if info and info.playback_status == 5:
+                print("[MEDIA] Відновлюю відтворення музики...")
+                # Відправляємо конкретно сигнал PLAY
+                await session.try_play_async()
+            else:
+                print("[MEDIA] Відновлення не потрібне (музика вже грає або плеєр закрито).")
+        
+        # Скидаємо прапорець
+        self.was_paused_by_assistant = False
 
     def pause_if_playing(self):
         """
-        Знаходить активні аудіо-сесії. Якщо вони відтворюють звук,
-        надсилає сигнал Play/Pause і запам'ятовує процеси.
-        Не робить нічого якщо музика вже на паузі.
+        Синхронна обгортка. 
+        Використовується у wake_word.py для зупинки музики.
         """
-        self.paused_by_assistant.clear() # Очищуємо перед новою операцією
-
-        found_playing_session = False
         try:
-            sessions = AudioUtilities.GetAllSessions()
-            for session in sessions:
-                if session.Process and self._is_session_audible(session):
-                    # Запам'ятовуємо ім'я процесу тільки якщо він реально відтворює
-                    self.paused_by_assistant.add(session.Process.name())
-                    found_playing_session = True
-
-            if found_playing_session:
-                print("[MEDIA] Знайдено активне відтворення. Ставлю на паузу...")
-                keyboard.press_and_release('play/pause')
-                return True  # Повертаємо True якщо щось поставили на паузу
-            else:
-                print("[MEDIA] Активного відтворення не знайдено. Залишаю як є.")
-                return False  # Повертаємо False якщо нічого не змінили
-
+            # Запускаємо асинхронний код у синхронному середовищі
+            return asyncio.run(self._pause_async())
         except Exception as e:
-            print(f"Помилка при спробі поставити медіа на паузу: {e}")
+            print(f"[MEDIA] Помилка при спробі поставити медіа на паузу: {e}")
             return False
 
     def resume_if_paused(self):
         """
-        Якщо асистент раніше ставив щось на паузу,
-        надсилає сигнал Play/Pause для відновлення.
+        Синхронна обгортка.
+        Використовується у wake_word.py для відновлення музики.
         """
-        if not self.paused_by_assistant:
-            print("[MEDIA] Нема процесів для відновлення.")
-            return
-
-        print("[MEDIA] Відновлення відтворення для раніше зупинених процесів...")
         try:
-            # Перевіряємо, чи хоча б один із зупинених процесів все ще активний
-            should_resume = False
-            sessions = AudioUtilities.GetAllSessions()
-            for session in sessions:
-                if session.Process and session.Process.name() in self.paused_by_assistant:
-                    should_resume = True
-                    break
-
-            if should_resume:
-                keyboard.press_and_release('play/pause')
-                print("[MEDIA] Відновлено відтворення.")
-            else:
-                print("[MEDIA] Раніше зупинені процеси більше не активні.")
-
+            asyncio.run(self._resume_async())
         except Exception as e:
-            print(f"Помилка при спробі відновити медіа: {e}")
-        finally:
-            self.paused_by_assistant.clear() # Очищуємо список у будь-якому випадку
+            print(f"[MEDIA] Помилка при спробі відновити медіа: {e}")
 
 # Створюємо один екземпляр для всього проєкту
 media_manager = MediaStateManager()

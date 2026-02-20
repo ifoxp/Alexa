@@ -1,11 +1,13 @@
-# browser_search.py
 import webbrowser
+import urllib.request
+import urllib.parse
+import re
 from typing import Dict, Any
 from .base_plugin import SmartPlugin
 
 
 class BrowserSearchPlugin(SmartPlugin):
-    """Плагін для пошуку в браузері, YouTube та інших веб-сервісах."""
+    """Плагін для пошуку в браузері: Google, YouTube (пошук або пряме відтворення першого відео)."""
 
     @property
     def name(self) -> str:
@@ -13,15 +15,14 @@ class BrowserSearchPlugin(SmartPlugin):
 
     @property
     def description(self) -> str:
-        return "Пошук в Google, YouTube, відкриття веб-сайтів. Підтримує пошук відео, каналів, загальний пошук в інтернеті."
+        return "Пошук в інтернеті. Вміє гуглити, шукати відео на YouTube, а також одразу вмикати потрібне відео (навіть якщо назва приблизна)."
 
     @property
     def commands(self) -> Dict[str, str]:
         return {
-            "search_youtube": "знайти відео на YouTube за запитом",
-            "search_google": "пошук в Google за запитом, включаючи пошук контенту на конкретних сайтах",
-            "open_website": "відкрити веб-сайт за прямим URL (тільки для готових посилань типу google.com)",
-            "search_youtube_channel": "знайти канал на YouTube"
+            "search_google": "Загальний пошук в інтернеті (Google) для будь-яких питань чи інформації",
+            "search_youtube": "Просто відкрити пошук на YouTube за запитом (коли користувач хоче сам вибрати відео зі списку)",
+            "play_youtube_video": "Знайти і ОДРАЗУ ВІДКРИТИ (відтворити) перше відео на YouTube за запитом (наприклад: 'останнє відео Джо Спіна', 'тучний жаб'(користувач може казати подібні назви типу Joss PIN, ми маєш шукати на українськумо або російському ютубі те що хоче отримати користувач))"
         }
 
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
@@ -31,183 +32,102 @@ class BrowserSearchPlugin(SmartPlugin):
             print(f"[1] Received command: {command_name}")
             print(f"[2] All kwargs: {kwargs}")
 
-            if command_name == "search_youtube":
-                query = kwargs.get("value") or kwargs.get("query", "")
-                print(f"[3] search_youtube with query: '{query}'")
-                result = await self._search_youtube(query)
-                print(f"[RESULT] search_youtube result: {result}")
-                return result
+            # Отримуємо запит (value або query)
+            query = kwargs.get("value") or kwargs.get("query") or kwargs.get("video", "")
 
-            elif command_name == "search_google":
-                query = kwargs.get("value") or kwargs.get("query", "")
-                print(f"[3] search_google with query: '{query}'")
-                result = await self._search_google(query)
-                print(f"[RESULT] search_google result: {result}")
-                return result
+            if not query:
+                return {"success": False, "result": None, "message": "Запит не може бути пустим"}
 
-            elif command_name == "open_website":
-                url = kwargs.get("value") or kwargs.get("url", "")
-                print(f"[3] open_website with url: '{url}'")
-                result = await self._open_website(url)
-                print(f"[RESULT] open_website result: {result}")
-                return result
+            if command_name == "search_google":
+                return await self._search_google(query)
 
-            elif command_name == "search_youtube_channel":
-                channel = kwargs.get("value") or kwargs.get("channel", "")
-                print(f"[3] search_youtube_channel with channel: '{channel}'")
-                result = await self._search_youtube_channel(channel)
-                print(f"[RESULT] search_youtube_channel result: {result}")
-                return result
+            elif command_name == "search_youtube":
+                return await self._search_youtube(query)
+
+            elif command_name == "play_youtube_video":
+                return await self._play_youtube_video(query)
 
             else:
-                return {
-                    "success": False,
-                    "result": None,
-                    "message": f"Невідома команда: {command_name}"
-                }
+                return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
             self.log_error(f"Error executing {command_name}", error=str(e))
-            return {
-                "success": False,
-                "result": None,
-                "message": f"Помилка виконання команди: {str(e)}"
-            }
-
-    async def _search_youtube(self, query: str) -> Dict[str, Any]:
-        """Пошук відео на YouTube."""
-        if not query:
-            return {
-                "success": False,
-                "result": None,
-                "message": "Запит для пошуку не може бути пустим"
-            }
-
-        try:
-            # Формуємо URL для YouTube пошуку
-            search_query = query.replace(" ", "+")
-            youtube_url = f"https://www.youtube.com/results?search_query={search_query}"
-
-            webbrowser.open(youtube_url)
-            self.log_info(f"Opened YouTube search: {query}")
-
-            return {
-                "success": True,
-                "result": {"url": youtube_url, "query": query},
-                "message": f"Відкрито пошук на YouTube: {query}"
-            }
-
-        except Exception as e:
-            self.log_error(f"Failed to search YouTube: {query}", error=str(e))
-            return {
-                "success": False,
-                "result": None,
-                "message": f"Помилка пошуку на YouTube: {str(e)}"
-            }
+            return {"success": False, "result": None, "message": f"Помилка виконання: {str(e)}"}
 
     async def _search_google(self, query: str) -> Dict[str, Any]:
-        """Пошук в Google."""
-        if not query:
-            return {
-                "success": False,
-                "result": None,
-                "message": "Запит для пошуку не може бути пустим"
-            }
-
+        """Простий пошук в Google."""
         try:
-            # Очищуємо запит від site: параметрів що можуть зламати посилання
-            clean_query = query
-            if "site:" in clean_query:
-                # Видаляємо всі site: параметри
-                import re
-                clean_query = re.sub(r'\s*site:[^\s]+', '', clean_query).strip()
-                print(f"[CLEAN] Removed site: parameter from '{query}' -> '{clean_query}'")
-
-            # Формуємо URL для Google пошуку
-            search_query = clean_query.replace(" ", "+")
+            search_query = urllib.parse.quote(query)
             google_url = f"https://www.google.com/search?q={search_query}"
-
+            
             webbrowser.open(google_url)
-            self.log_info(f"Opened Google search: {clean_query}")
-
+            self.log_info(f"Opened Google search: {query}")
+            
             return {
-                "success": True,
-                "result": {"url": google_url, "query": clean_query},
-                "message": f"Відкрито пошук в Google: {clean_query}"
+                "success": True, 
+                "result": {"url": google_url}, 
+                "message": f"Відкриваю пошук в Google за запитом: {query}"
             }
-
         except Exception as e:
-            self.log_error(f"Failed to search Google: {query}", error=str(e))
-            return {
-                "success": False,
-                "result": None,
-                "message": f"Помилка пошуку в Google: {str(e)}"
-            }
+            return {"success": False, "result": None, "message": str(e)}
 
-    async def _open_website(self, url: str) -> Dict[str, Any]:
-        """Відкриває веб-сайт."""
-        if not url:
-            return {
-                "success": False,
-                "result": None,
-                "message": "URL не може бути пустим"
-            }
-
+    async def _search_youtube(self, query: str) -> Dict[str, Any]:
+        """Відкриває сторінку з результатами пошуку на YouTube."""
         try:
-            # Якщо це схоже на URL - відкриваємо як сайт
-            if url.startswith(('http://', 'https://')) or ('.' in url and ' ' not in url):
-                # Це справжній URL
-                if not url.startswith(('http://', 'https://')):
-                    url = f"https://{url}"
-            else:
-                # Це пошуковий запит - робимо Google пошук
-                print(f"[WEBSITE] Treating '{url}' as search query, redirecting to Google")
-                return await self._search_google(url)
-
-            webbrowser.open(url)
-            self.log_info(f"Opened website: {url}")
-
-            return {
-                "success": True,
-                "result": {"url": url},
-                "message": f"Відкрито веб-сайт: {url}"
-            }
-
-        except Exception as e:
-            self.log_error(f"Failed to open website: {url}", error=str(e))
-            return {
-                "success": False,
-                "result": None,
-                "message": f"Помилка відкриття веб-сайту: {str(e)}"
-            }
-
-    async def _search_youtube_channel(self, channel: str) -> Dict[str, Any]:
-        """Пошук каналу на YouTube."""
-        if not channel:
-            return {
-                "success": False,
-                "result": None,
-                "message": "Назва каналу не може бути пустою"
-            }
-
-        try:
-            # Формуємо URL для пошуку каналу на YouTube
-            search_query = f"{channel} channel".replace(" ", "+")
-            youtube_url = f"https://www.youtube.com/results?search_query={search_query}&sp=EgIQAg%253D%253D"
-
+            search_query = urllib.parse.quote(query)
+            youtube_url = f"https://www.youtube.com/results?search_query={search_query}"
+            
             webbrowser.open(youtube_url)
-            self.log_info(f"Opened YouTube channel search: {channel}")
-
+            self.log_info(f"Opened YouTube search: {query}")
+            
             return {
-                "success": True,
-                "result": {"url": youtube_url, "channel": channel},
-                "message": f"Відкрито пошук каналу на YouTube: {channel}"
+                "success": True, 
+                "result": {"url": youtube_url}, 
+                "message": f"Шукаю '{query}' на YouTube."
             }
-
         except Exception as e:
-            self.log_error(f"Failed to search YouTube channel: {channel}", error=str(e))
-            return {
-                "success": False,
-                "result": None,
-                "message": f"Помилка пошуку каналу: {str(e)}"
-            }
+            return {"success": False, "result": None, "message": str(e)}
+
+    async def _play_youtube_video(self, query: str) -> Dict[str, Any]:
+        """Непомітно шукає відео, знаходить перше посилання і відкриває саме його."""
+        try:
+            print(f"[YT PLAYER] Спроба знайти пряме посилання для: '{query}'")
+            
+            # Формуємо запит
+            search_query = urllib.parse.quote(query)
+            search_url = f"https://www.youtube.com/results?search_query={search_query}"
+            
+            # Робимо прихований запит до YouTube (прикидаємося браузером)
+            req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+            html_content = urllib.request.urlopen(req).read().decode('utf-8')
+            
+            # Шукаємо всі ID відео за допомогою регулярного виразу
+            video_ids = re.findall(r"watch\?v=(\S{11})", html_content)
+            
+            if video_ids:
+                # Беремо перше знайдене відео
+                first_video_id = video_ids[0]
+                video_url = f"https://www.youtube.com/watch?v={first_video_id}"
+                
+                print(f"[YT PLAYER] Знайдено відео: {video_url}")
+                webbrowser.open(video_url)
+                
+                return {
+                    "success": True, 
+                    "result": {"url": video_url}, 
+                    "message": f"Вмикаю відео за запитом: {query}"
+                }
+            else:
+                # Якщо регулярка не спрацювала (наприклад, ютуб змінив дизайн), 
+                # то просто відкриваємо пошук (fallback)
+                print("[YT PLAYER] Відео не знайдено, відкриваю звичайний пошук.")
+                webbrowser.open(search_url)
+                return {
+                    "success": True, 
+                    "result": {"url": search_url}, 
+                    "message": f"Відкриваю результати пошуку для: {query}"
+                }
+                
+        except Exception as e:
+            self.log_error(f"Failed to play YouTube video: {query}", error=str(e))
+            return {"success": False, "result": None, "message": f"Помилка відтворення: {str(e)}"}

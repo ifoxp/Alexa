@@ -25,12 +25,15 @@ class OnlineTranscriber:
             logger.info("Starting microphone calibration")
             self.recognizer.adjust_for_ambient_noise(source, duration=2.0)
             
-            # ФІКСУЄМО поріг гучності (щоб він не стрибав і не ковтав тихі слова)
-            self.recognizer.dynamic_energy_threshold = False
-            self.recognizer.energy_threshold = 400 # Якщо все ще не чує тихі звуки - зменш до 300
+            # Вмикаємо динамічний поріг, щоб він підлаштовувався під шум кулерів/вулиці
+            self.recognizer.dynamic_energy_threshold = True
             
-            self.recognizer.pause_threshold = 1.5  # 2.0 забагато, він буде довго "тупити" після фрази
-            self.recognizer.phrase_threshold = 0.1 # Робимо його дуже чутливим до початку слів
+            # Зменшуємо базовий поріг, щоб краще чути тихий голос
+            self.recognizer.energy_threshold = 250 
+            
+            # Збільшуємо час паузи, щоб ти міг робити перерви між словами
+            self.recognizer.pause_threshold = 2.0  
+            self.recognizer.phrase_threshold = 0.1 
             self.recognizer.non_speaking_duration = 0.5
             logger.info("Microphone calibration completed with optimized settings")
 

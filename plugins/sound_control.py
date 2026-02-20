@@ -20,7 +20,7 @@ class SystemControlPlugin(SmartPlugin):
 
     @property
     def description(self) -> str:
-        return "Управління гучністю: системи, активного вікна або конкретної програми за назвою."
+        return "Управління загальним звуком Windows (гучність системи). УВАГА: НЕ використовуй цей плагін для зупинки музики у Spotify (для цього є music_control)."
 
     @property
     def commands(self) -> Dict[str, str]:
