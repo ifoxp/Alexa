@@ -11,11 +11,11 @@ class NewsReaderPlugin(SmartPlugin):
 
     @property
     def name(self) -> str:
-        return "news_reader"
+        return "news_search"
 
     @property
     def description(self) -> str:
-        return "Збирає актуальні новини з інтернету та розповідає їх голосом. Використовуй для команд на зразок 'розкажи новини', 'що у світі', 'новини технологій'."
+        return "Пошук новин в інтернеті. Збирає актуальні новини з інтернету та розповідає їх голосом. Використовуй для команд на зразок 'розкажи новини', 'що у світі', 'новини технологій'."
 
     @property
     def commands(self) -> Dict[str, str]:

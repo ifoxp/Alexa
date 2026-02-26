@@ -4,6 +4,7 @@ from datetime import datetime
 from openai import AsyncOpenAI
 from logger_config import get_logger
 from audio_player import speak_text
+from command_logger import command_logger
 
 logger = get_logger('smart_ai')
 
@@ -65,30 +66,53 @@ class SmartAssistant:
 
             plugins_text = '\n'.join(plugins_list)
            
-            # Додаємо жорстку підказку про контекст, якщо він є
+            # Додаємо контекст у тому ж форматі що і в execute_plugin_commands
             context_hint = ""
-            if self.conversation_history and getattr(self, 'last_active_plugins', None):
-                context_hint = f"\nКОНТЕКСТ ПОПЕРЕДНЬОЇ ДІЇ:\nМинула команда: '{self.conversation_history[-1]}'\nВикористані плагіни: {self.last_active_plugins}\nЯкщо поточний запит є продовженням минулого (наприклад 'тихіше', 'гучніше', 'ще', 'наступний'), ОБОВ'ЯЗКОВО поверни ці ж самі плагіни!\n"
+            if len(self.conversation_history) >= 1 and len(self.last_responses) >= 1:
+                # Останні 2 записи у форматі "користувач сказав; ... Jarvis відповів: ..."
+                conversations = []
+                for i in range(min(len(self.conversation_history), len(self.last_responses), 2)):
+                    idx = -(i + 1)  # Починаємо з останнього елемента
+                    user_said = self.conversation_history[idx]
+                    jarvis_replied = self.last_responses[idx]
+                    conversations.insert(0, f"користувач сказав; {user_said}\nJarvis відповів: {jarvis_replied}")
 
-            prompt = f"""Ти — ядро маршрутизації голосового асистента. Твоє завдання — проаналізувати репліку і вирішити, чи це команда для виконання, чи просто звичайна розмова.
+                # Додаємо інформацію про плагіни до останнього запису контексту
+                if getattr(self, 'last_active_plugins', None):
+                    last_conversation = conversations[-1]  # Останній запис
+                    last_conversation += f"\nВикористані плагіни: {self.last_active_plugins}"
+                    conversations[-1] = last_conversation
+
+                context_hint = f"\nКОНТЕКСТ ПОПЕРЕДНЬОЇ ДІЇ:\n" + "\n".join(conversations)
+                context_hint += f"\n\nЯК ПРАЦЮВАТИ З КОНТЕКСТОМ:\n1. Якщо користувач просить продовжити ту саму дію (наприклад, 'тихіше', 'гучніше', 'ще', 'наступний') — ОБОВ'ЯЗКОВО поверни ті ж самі плагіни.\n2. Якщо користувач продовжує говорити про ТОЙ САМИЙ об'єкт (наприклад, про Samsung), але хоче зробити ІНШУ дію (наприклад, замість новин тепер хоче дізнатися, де купити) — обери НОВИЙ плагін, який підходить для цієї нової дії (наприклад, browser_search)."
+
+            prompt = f"""Ти — ядро маршрутизації голосового асистента. Твоє завдання — проаналізувати репліку і вирішити, чи це цільовий запит до тебе (команда), чи просто фонова розмова.
 
 Користувач каже: "{user_text}"
+Попредні відповіді для контексту:
 {context_hint}
+
 ДОСТУПНІ ПЛАГІНИ ТА ЇХНІ ОПИСИ:
 {plugins_text}
 
-ЛОГІКА ПРИЙНЯТТЯ РІШЕНЬ (Думай крок за кроком):
-1. Проаналізуй суть репліки користувача. Що він хоче?
-2. Прочитай описи доступних плагінів. Чи перетинається намір користувача з функціоналом хоча б одного з них?
-3. Якщо намір користувача відповідає зоні відповідальності певного плагіна (навіть якщо репліка обірвана, наприклад, містить слово "Spotify", "відкрий", "знайди", "тихіше") — це КОМАНДА (isCommand: true).
-4. Якщо репліка є просто реакцією ("класно", "дякую"), роздумами вголос, або не має жодного відношення до описаного функціоналу плагінів — це ЗВИЧАЙНА РОЗМОВА (isCommand: false).
+ЛОГІКА ПРИЙНЯТТЯ РІШЕНЬ (Уважно читай кожне правило):
+1. ВИЗНАЧЕННЯ КОМАНДИ: Команда — це БУДЬ-ЯКИЙ запит, який вимагає від тебе дії: пошуку інформації, читання новин, запуску програм, перевірки графіків або створення нотаток. Навіть якщо це звучить як просте питання ("які новини?", "що по графіку?", "знайди фільм") — ЦЕ КОМАНДА.
+2. ЗВЕРНЕННЯ ДО АСИСТЕНТА: Якщо репліка містить наказовий спосіб ("розкажи", "покажи", "знайди", "запусти") або пряме запитання, яке відповідає функціоналу плагінів — вважай, що звертаються саме до тебе.
+3. ЗІСТАВЛЕННЯ: Проаналізуй намір користувача та описи плагінів. Якщо запит користувача можна виконати за допомогою ХОЧА Б ОДНОГО з перелічених плагінів — це 100% КОМАНДА (isCommand: true) і ти маєш вказати цей плагін.
+4. ЗВИЧАЙНА РОЗМОВА: Це ЛИШЕ ті випадки, коли користувач просто спілкується ("привіт", "як справи", "круто", "дякую"), розмовляє з кимось іншим у кімнаті, або його репліка взагалі не стосується жодного з доступних плагінів. Тільки тоді isCommand: false.
 
-ФОРМАТ ВІДПОВІДІ (тільки JSON):
-{{"isCommand": true, "success": true, "plugins": ["назва_плагіна_з_переліку"], "confidence": 0.95}}
-АБО (якщо це звичайна розмова, яка не потребує плагінів)
-{{"isCommand": false}}
+ФОРМАТ ВІДПОВІДІ (строго JSON, жодного іншого тексту):
+{{
+  "reasoning": "Тут коротко поясни крок за кроком, що хоче користувач і до якого плагіна це належить",
+  "isCommand": true_або_false,
+  "plugins": ["назва_плагіна_з_переліку_якщо_є"],
+  "confidence": 0.95
+}}
 
-Видай лише валідний JSON без додаткових пояснень."""
+Увага:
+- Обирай плагіни ТІЛЬКИ з наданого списку.
+- Якщо isCommand = false, масив plugins має бути порожнім [].
+"""
 
             # ОПТИМІЗОВАНИЙ ВИКЛИК ЕТАПУ 1
             response = await self.client.chat.completions.create(
@@ -99,10 +123,10 @@ class SmartAssistant:
                 ],
                 response_format={"type": "json_object"},
                 max_completion_tokens=200, # Параметр для 4.1 серії
-                temperature=0.1,
+                temperature=0.4,
                 timeout=10
             )
-
+            print(f"Available plugins for selection:\n{prompt}")
             result_text = response.choices[0].message.content.strip()
             print(f"GPT plugin selection result: {result_text}")
 
@@ -174,15 +198,20 @@ class SmartAssistant:
 
         commands_text = '\n'.join(all_commands)
 
-        # Додаємо контекст попередніх команд
+        # Додаємо контекст у новому форматі: "користувач сказав; ... Jarvis відповів: ..."
         context_text = ""
-        if self.conversation_history:
-            context_text = f"\nПопередні команди користувача: {' | '.join(self.conversation_history)}"
+        if len(self.conversation_history) >= 1 and len(self.last_responses) >= 1:
+            # Останні 2 записи
+            conversations = []
+            for i in range(min(len(self.conversation_history), len(self.last_responses), 2)):
+                idx = -(i + 1)  # Починаємо з останнього елемента
+                user_said = self.conversation_history[idx]
+                jarvis_replied = self.last_responses[idx]
+                conversations.insert(0, f"користувач сказав; {user_said}\nJarvis відповів: {jarvis_replied}")
 
-        # Додаємо інформацію про попередні відповіді Jarvis
-        if self.last_responses:
-            context_text += f"\nТвої попередні відповіді: {' | '.join(self.last_responses)}"
-
+            context_text = f"\nПопередній контекст:\n" + "\n".join(conversations)
+            context_text += f"\n\nЯК ПРАЦЮВАТИ З КОНТЕКСТОМ:\n1. Якщо користувач просить продовжити ту саму дію (наприклад, 'тихіше', 'гучніше', 'ще', 'наступний') — ОБОВ'ЯЗКОВО поверни ті ж самі плагіни.\n2. Якщо користувач продовжує говорити про ТОЙ САМИЙ об'єкт (наприклад, про Samsung), але хоче зробити ІНШУ дію (наприклад, замість новин тепер хоче дізнатися, де купити) — обери НОВИЙ плагін, який підходить для цієї нової дії."
+        # Формуємо системний промпт (правила для JARVIS)
         # Формуємо системний промпт (правила для JARVIS)
         system_prompt = """Ти — JARVIS, високоінтелектуальний штучний інтелект. 
 Твоя задача: перетворити запит користувача на команди для системи та згенерувати коротку відповідь.
@@ -197,35 +226,39 @@ class SmartAssistant:
 - Гучність: "трішки тише" (~10-15%), "значно тише" (~30-50%).
 - Програми: витягуй точну офіційну назву ("стім" → "Steam").
 - Пошук: залишай лише ключові слова.
-- Якщо кілька програм: використовуй ключі open_program1, open_program2.
-ВАЖЛИВО: Ключ 'commands' має бути ПЛОСКИМ об'єктом, де ключ — назва команди, а значення — її параметр.
-Приклад: {"open_program": "Steam", "set_volume": 20}
+
+СУВОРА ЗАБОРОНА:
+Ключ 'commands' має бути ПЛОСКИМ об'єктом. Тобі СУВОРО ЗАБОРОНЕНО вигадувати свої назви команд. Ти ПОВИНЕН брати точні назви команд ЛИШЕ з наданого списку. Наприклад, якщо треба увімкнути виконавця, використовуй саме ту команду, яка для цього вказана в списку, а не вигадуй 'play_artist'.
+
 ФОРМАТ ВІДПОВІДІ (строго JSON):
 {
-  "commands": {"назва_команди": "значення_параметра"},
+  "thought_process": "Коротко проаналізуй, що треба зробити і ЯКУ ТОЧНО команду зі списку ти обереш.",
+  "commands": {"точна_назва_команди_зі_списку": "значення_параметра"},
   "jarvis_response": "Твоя унікальна, жива відповідь на 4-10 слів, що закінчується на 'сер'."
 }"""
 
         # Формуємо користувацький промпт (поточна ситуація)
         user_prompt = f"""Користувач каже: "{user_text}"
 
-Доступні команди:
-{commands_text}
 {context_text}
 
-Проаналізуй запит, обери команди та згенеруй відповідь у форматі JSON."""
+Доступні команди:
+{commands_text}
 
+Проаналізуй запит, обери команди та згенеруй відповідь у форматі JSON."""
+        print(f"Executing plugin commands with prompt:\n{user_prompt}")
         try:
             # ОПТИМІЗАЦІЯ ДЛЯ ЕТАПУ 2 (GPT-5 NANO)
+            # ОПТИМІЗАЦІЯ ДЛЯ ЕТАПУ 2 (GPT-4.1 NANO)
             response = await self.client.chat.completions.create(
-                model="gpt-4.1-mini", 
+                model="gpt-4.1-nano", 
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
                 response_format={"type": "json_object"},
                 max_completion_tokens=400,
-                temperature=0.7,
+                temperature=0.3, # ЗНИЖЕНО ДЛЯ СТАБІЛЬНОСТІ
                 timeout=12
             )
 
@@ -241,8 +274,9 @@ class SmartAssistant:
             plugin_commands = {}
 
             for command_name, param_value in commands_dict.items():
-                # Видаляємо цифри з назви команди для пошуку плагіна (open_program1 -> open_program)
-                base_command = ''.join(c for c in command_name if not c.isdigit())
+                # Видаляємо цифрові суфікси з назви команди для пошуку плагіна (open_program1 -> open_program, set_specific_app_volume_2 -> set_specific_app_volume)
+                import re
+                base_command = re.sub(r'_?\d+$', '', command_name)
 
                 plugin_name = plugin_command_map.get(base_command)
                 if plugin_name:
@@ -317,6 +351,13 @@ async def process_smart_command(user_text):
     """Основна функція для обробки команд через ШІ (2-етапна система)"""
     if not smart_assistant:
         logger.error("AI assistant not configured")
+
+        # Логуємо навіть якщо ШІ не налаштований
+        try:
+            await command_logger.log_command(user_text, "ШІ асистент не налаштовано", "Етап 2 не досягнуто")
+        except:
+            pass
+
         return {
             "success": False,
             "message": "ШІ асистент не налаштовано. Перевірте API ключ у config.json"
@@ -332,7 +373,13 @@ async def process_smart_command(user_text):
         # ЕТАП 1: GPT обирає потрібні плагіни
         plugin_selection = await smart_assistant.select_plugins(user_text)
 
+        # Логуємо етап 1 (завжди)
+        stage1_response = str(plugin_selection)
+
         if not plugin_selection.get("success"):
+            # Логуємо неуспішну команду
+            await command_logger.log_command(user_text, stage1_response, "Команда не виконана - етап 2 не досягнуто")
+
             # Перевіряємо чи це звичайна розмова
             if plugin_selection.get("casual_talk"):
                 return {
@@ -353,6 +400,12 @@ async def process_smart_command(user_text):
         quick_response, execution_plan = await smart_assistant.generate_jarvis_response_parallel(
             user_text, selected_plugins
         )
+
+        # Логуємо етап 2
+        stage2_response = f"Jarvis response: {quick_response} | Execution plan: {execution_plan}"
+
+        # Зберігаємо в лог файл
+        await command_logger.log_command(user_text, stage1_response, stage2_response)
 
         # ГОТУЄМО відповідь заздалегідь але НЕ озвучуємо до успішного виконання
         print(f"Quick Jarvis response prepared: {quick_response}")
@@ -485,6 +538,12 @@ async def process_smart_command(user_text):
             'user_text': user_text,
             'traceback': traceback.format_exc()
         })
+
+        # Логуємо помилку
+        try:
+            await command_logger.log_command(user_text, f"ПОМИЛКА: {error_msg}", "Етап 2 не досягнуто через помилку")
+        except:
+            pass  # Щоб не зациклитися на помилках логування
 
         return {
             "success": False,
