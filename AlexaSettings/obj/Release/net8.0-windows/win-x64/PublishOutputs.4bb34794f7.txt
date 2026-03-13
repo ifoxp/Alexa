@@ -1,2 +1,0 @@
-E:\Programing\Phyton\Alexa\AlexaSettings\bin\publish\AlexaSettings.pdb
-E:\Programing\Phyton\Alexa\AlexaSettings\bin\publish\AlexaSettings.exe

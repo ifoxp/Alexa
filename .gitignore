@@ -182,15 +182,9 @@ cython_debug/
 
 # --- C# / .NET Specific ---
 
-# Build results (only build outputs, not source code)
-AlexaS/*/bin/
-AlexaS/*/obj/
-AlexaS/packages/
-!AlexaS/AlexaS/*.cs
-!AlexaS/AlexaS/*.csproj
-!AlexaS/AlexaS/*.resx
-!AlexaS/AlexaS/*.config
-!AlexaS/AlexaS/Properties/
+# Build results
+AlexaSettings/bin/
+AlexaSettings/obj/
 
 # Visual Studio files
 *.suo
