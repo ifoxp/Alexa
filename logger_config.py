@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-def setup_logger(name='alexa_assistant', level=logging.INFO):
+def setup_logger(name='alexa_assistant', level=logging.WARNING):
     """Налаштовує structured logging для асистента."""
 
     # Створюємо папку для логів
@@ -26,7 +26,7 @@ def setup_logger(name='alexa_assistant', level=logging.INFO):
     # Файловий handler для всіх логів
     log_file = logs_dir / f"{name}_{datetime.now().strftime('%Y%m%d')}.log"
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(logging.INFO)  # Тільки INFO і вище
     file_handler.setFormatter(log_format)
 
     # Окремий файл для помилок

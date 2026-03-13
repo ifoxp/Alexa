@@ -36,7 +36,7 @@ class AudioBuffer:
             self.stats['writes'] += 1
             if old_size == self.buffer.maxlen and len(audio_data) > 0:
                 self.stats['overflows'] += 1
-                logger.debug("Audio buffer overflow", extra={'buffer_size': len(self.buffer)})
+                # Видаляємо спам-логування overflow
 
             # Сповіщуємо читачів
             self.condition.notify_all()
@@ -52,10 +52,7 @@ class AudioBuffer:
             while len(self.buffer) < frame_size and self.is_active:
                 if timeout and (time.time() - start_time) >= timeout:
                     self.stats['underflows'] += 1
-                    logger.debug("Audio buffer timeout", extra={
-                        'requested': frame_size,
-                        'available': len(self.buffer)
-                    })
+                    # Видаляємо спам timeout логи
                     return None
 
                 self.condition.wait(timeout=0.1)
@@ -75,10 +72,7 @@ class AudioBuffer:
 
             if len(frame) < frame_size:
                 self.stats['underflows'] += 1
-                logger.debug("Audio buffer underflow", extra={
-                    'requested': frame_size,
-                    'got': len(frame)
-                })
+                # Видаляємо спам underflow логи
 
             return frame if frame else None
 
@@ -92,7 +86,7 @@ class AudioBuffer:
         with self.condition:
             self.buffer.clear()
             self.condition.notify_all()
-            logger.debug("Audio buffer cleared")
+            # Видаляємо debug лог cleared
 
     def stop(self):
         """Зупиняє буфер."""
@@ -130,7 +124,7 @@ class BufferedAudioStream:
 
     def _buffer_loop(self):
         """Головний цикл читання з потоку в буфер."""
-        logger.debug("Audio buffer loop started")
+        # Видаляємо debug лог loop started
 
         while self.is_running:
             try:
@@ -152,7 +146,7 @@ class BufferedAudioStream:
                 logger.error("Audio buffer loop error", extra={'error': str(e)})
                 time.sleep(0.1)
 
-        logger.debug("Audio buffer loop stopped")
+        # Видаляємо debug лог loop stopped
 
     def read_frame(self, frame_size, timeout=1.0):
         """Читає кадр з буфера."""
@@ -188,5 +182,6 @@ class BufferedAudioStream:
                     self.stream.stop_stream()
                 self.stream.close()
             except Exception as e:
-                logger.debug("Stream close error", extra={'error': str(e)})
+                # Видаляємо debug лог stream close error
+                pass
         logger.info("Buffered audio stream closed")

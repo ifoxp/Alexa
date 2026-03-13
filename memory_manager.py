@@ -24,10 +24,7 @@ class MemoryManager:
                 # Стандартний cleanup через context manager
                 self.resources.append((weakref.ref(resource), None))
 
-            logger.debug("Resource registered", extra={
-                'resource_type': type(resource).__name__,
-                'total_resources': len(self.resources)
-            })
+            # Видаляємо спам логування resource registered
 
     def add_cleanup_callback(self, callback):
         """Додає callback для виконання під час очищення."""

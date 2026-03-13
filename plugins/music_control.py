@@ -40,7 +40,7 @@ class MusicControlPlugin(SmartPlugin):
 
     @property
     def description(self) -> str:
-        return "Пряме управління Spotify. Використовуй це для відтворення ТА ЗУПИНКИ (паузи) музики."
+        return "Пряме управління Spotify. ЗАВЖДИ використовуй цей плагін для команд: включи музику, включи пісню, включи виконавця, включи трек, увімкни Spotify, пауза музики, наступний трек, попередній трек, відтворення музики."
     
     @property
     def commands(self) -> Dict[str, str]:

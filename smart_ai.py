@@ -126,9 +126,9 @@ class SmartAssistant:
                 temperature=0.4,
                 timeout=10
             )
-            print(f"Available plugins for selection:\n{prompt}")
+            logger.info(f"GPT ЕТАП 1 ПРОМПТ:\n{prompt}")
             result_text = response.choices[0].message.content.strip()
-            print(f"GPT plugin selection result: {result_text}")
+            logger.info(f"GPT ЕТАП 1 ВІДПОВІДЬ: {result_text}")
 
             if not result_text:
                 return {"success": False, "error": "Empty response from GPT"}
@@ -246,7 +246,7 @@ class SmartAssistant:
 {commands_text}
 
 Проаналізуй запит, обери команди та згенеруй відповідь у форматі JSON."""
-        print(f"Executing plugin commands with prompt:\n{user_prompt}")
+        logger.info(f"GPT ЕТАП 2 ПРОМПТ:\n{user_prompt}")
         try:
             # ОПТИМІЗАЦІЯ ДЛЯ ЕТАПУ 2 (GPT-5 NANO)
             # ОПТИМІЗАЦІЯ ДЛЯ ЕТАПУ 2 (GPT-4.1 NANO)
@@ -263,7 +263,7 @@ class SmartAssistant:
             )
 
             result_text = response.choices[0].message.content.strip()
-            print(f"Stage 2 AI response: '{result_text}'")
+            logger.info(f"GPT ЕТАП 2 ВІДПОВІДЬ: {result_text}")
 
             # Тепер результат містить команди + jarvis відповідь
             parsed_result = json.loads(result_text)

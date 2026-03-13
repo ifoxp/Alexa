@@ -150,8 +150,16 @@ def copy_config_file():
     # 2. Створюємо dist папку, якщо вона ще не існує
     dist_dir.mkdir(exist_ok=True)
 
+    # 3. Перевіряємо чи потрібно оновити файл
+    if config_target.exists():
+        source_time = config_source.stat().st_mtime
+        target_time = config_target.stat().st_mtime
+        if source_time <= target_time:
+            print(f"OK: Файл {config_source.name} актуальний, копіювання не потрібно")
+            return True
+
     try:
-        # 3. Копіюємо файл (shutil.copy2 зберігає метадані файлу)
+        # 4. Копіюємо файл (shutil.copy2 зберігає метадані файлу)
         shutil.copy2(config_source, config_target)
         print(f"OK: Файл {config_source.name} успішно скопійовано до {dist_dir.name}")
         return True
@@ -194,9 +202,27 @@ def build():
     print("[OK] Шляхи успішно знайдено.")
 
     print("2/5. Формування команди PyInstaller...")
+
+    # Список локальних Python модулів для додавання як дані
+    local_modules = [
+        'audio_buffer.py',
+        'memory_manager.py',
+        'wake_word.py',
+        'tray_manager.py',
+        'smart_ai.py',
+        'config_manager.py',
+        'logger_config.py',
+        'command_manager.py',
+        'command_logger.py',
+        'transcriber.py',
+        'audio_player.py',
+        'smart_plugin_manager.py',
+        'settings.py'
+    ]
+
     command = [
         'pyinstaller',
-        '--onefile',
+        '--onedir',
         f'--name={EXE_NAME}',
         f'--icon={ICON_FILE}',
         # Додаємо обидві папки pvporcupine
@@ -206,15 +232,40 @@ def build():
         f'--add-data={plugins_path}{os.pathsep}plugins',
         MAIN_SCRIPT
     ]
+
+    # Додаємо локальні модулі як дані
+    for module in local_modules:
+        module_path = BASE_DIR / module
+        if module_path.exists():
+            command.extend([f'--add-data={module_path}{os.pathsep}.'])
+            command.extend([f'--hidden-import={module[:-3]}'])  # Видаляємо .py розширення
+
+    # Додаємо інші необхідні hidden imports
+    command.extend([
+        '--hidden-import=pyaudio',
+        '--hidden-import=pvporcupine',
+        '--hidden-import=pystray',
+        '--hidden-import=PIL',
+        '--hidden-import=threading',
+        '--hidden-import=json',
+        '--hidden-import=logging'
+    ])
     if HIDE_CONSOLE:
         command.append('--noconsole')
         
     print(f"   > Команда: {' '.join(command)}")
 
-    print("\n3/5. Запуск процесу збірки... Це може зайняти деякий час.")
+    print("\n3/5. Очищення старої збірки та запуск процесу...")
+
+    # Очищаємо старі файли dist/Alexa якщо є
+    alexa_dist_dir = BASE_DIR / "dist" / EXE_NAME
+    if alexa_dist_dir.exists():
+        print(f"   > Видаляємо стару збірку: {alexa_dist_dir}")
+        shutil.rmtree(alexa_dist_dir, ignore_errors=True)
+
+    print("   > Запуск PyInstaller... Це може зайняти деякий час.")
     try:
-        # ... (решта коду запуску та очищення залишається без змін) ...
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    text=True, encoding='utf-8', errors='replace')
         while True:
             output = process.stdout.readline()
@@ -236,7 +287,7 @@ def build():
         return
 
     print("\n4/6. Копіювання C# додатку налаштувань...")
-    copy_csharp_settings_app()
+    #copy_csharp_settings_app()
 
     print("\n5/6. Копіювання папки plugins...")
     copy_plugins_folder()
@@ -251,9 +302,11 @@ def build():
         print(f"[УВАГА] Не вдалося видалити тимчасові файли: {e}")
 
     print(f"\n--- Готово! ---")
-    print(f"Основний додаток: dist/{EXE_NAME}.exe")
+    print(f"Основний додаток: dist/{EXE_NAME}/{EXE_NAME}.exe")
     print(f"Налаштування: dist/AlexaSettingsApp.exe")
-    print(f"--- Не забудьте покласти файл 'config.json' в папку 'dist' ---")
+    print(f"Конфігурація: dist/config.json")
+    print(f"УВАГА: При --onedir структурі запускайте додаток з папки dist/{EXE_NAME}/")
+    print(f"Рекомендується створити ярлик на робочому столі для зручності")
 
 
 if __name__ == "__main__":

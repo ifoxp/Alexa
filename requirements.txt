@@ -33,3 +33,5 @@ Pillow
 
 # Build tool (тільки для розробки)
 pyinstaller
+
+screen-brightness-control
