@@ -164,7 +164,7 @@ namespace AlexaSettings
             lblPicovoiceKeyHint.Size = new Size(530, 32);
             lblPicovoiceKeyHint.ForeColor = hintColor;
 
-            lblOpenAiKey.Text = "OpenAI API Key:";
+            lblOpenAiKey.Text = "Gemini API Key:";
             lblOpenAiKey.Location = new Point(lx, 115);
             lblOpenAiKey.AutoSize = true;
             lblOpenAiKey.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
@@ -172,7 +172,7 @@ namespace AlexaSettings
             txtOpenAiKey.Location = new Point(lx, 135);
             txtOpenAiKey.Size = new Size(530, 26);
 
-            lblOpenAiKeyHint.Text = "Ключ для ШІ-асистента (ChatGPT). Якщо порожньо або ШІ вимкнений — ChatGPT не використовується.\nОтримати на platform.openai.com.";
+            lblOpenAiKeyHint.Text = "Ключ для ШІ-асистента (Gemini). Якщо порожньо або ШІ вимкнений — Gemini не використовується.\nОтримати на aistudio.google.com.";
             lblOpenAiKeyHint.Location = new Point(lx, 165);
             lblOpenAiKeyHint.Size = new Size(530, 34);
             lblOpenAiKeyHint.ForeColor = hintColor;

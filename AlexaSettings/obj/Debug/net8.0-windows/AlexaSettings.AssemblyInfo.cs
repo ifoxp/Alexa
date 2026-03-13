@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AlexaSettings")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+af50a12d9ab9d7cd9e58543726b8ad7e2c1f4dfb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5a9d6b2c5121a3ce7c82fce6e9d40c90d5a730bf")]
 [assembly: System.Reflection.AssemblyProductAttribute("AlexaSettings")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AlexaSettings")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

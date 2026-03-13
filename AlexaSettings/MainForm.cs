@@ -283,13 +283,21 @@ namespace AlexaSettings
                     string? alexaExe = FindAlexaExe();
                     if (alexaExe == null)
                     {
-                        MessageBox.Show(
-                            "Alexa.exe не знайдено поруч з цим додатком.\nСпочатку зробіть білд через build.py.",
-                            "Не знайдено", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        chkAutostart.CheckedChanged -= chkAutostart_CheckedChanged;
-                        chkAutostart.Checked = false;
-                        chkAutostart.CheckedChanged += chkAutostart_CheckedChanged;
-                        return;
+                        // Пропонуємо вибрати Alexa.exe вручну
+                        using var ofd = new OpenFileDialog
+                        {
+                            Title = "Вкажіть розташування Alexa.exe",
+                            Filter = "Alexa.exe|Alexa.exe|Всі файли|*.exe",
+                            FileName = "Alexa.exe"
+                        };
+                        if (ofd.ShowDialog() != DialogResult.OK)
+                        {
+                            chkAutostart.CheckedChanged -= chkAutostart_CheckedChanged;
+                            chkAutostart.Checked = false;
+                            chkAutostart.CheckedChanged += chkAutostart_CheckedChanged;
+                            return;
+                        }
+                        alexaExe = ofd.FileName;
                     }
                     key.SetValue(AutostartAppName, $"\"{alexaExe}\"");
                     lblAutostartPath.Text = "Шлях: " + alexaExe;
