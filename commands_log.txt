@@ -1,480 +1,168 @@
 
 ========================================
-Час: 2026-02-25 09:10:47
-Команда користувача: включи на Spotify Imagine Dragon
+Час: 2026-03-13 15:33:40
+Команда користувача: Запусти на Spotify плейлисти слушать
 GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Відкриваю музику Imagine Dragons для вас, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}]
+GPT Етап 2 (команди + відповідь): Jarvis response: Відкриваю Spotify для вас, сер. Насолоджуйтесь музикою! | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': ''}}, {'command': 'play_playlist', 'params': {'value': ''}}]}]
 ========================================
 
 
 ========================================
-Час: 2026-02-25 10:38:34
-Команда користувача: включи плейлист музики DZIDZIO
+Час: 2026-03-13 15:34:37
+Команда користувача: музику Imagine Dragons на Spotify
 GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Вмикаю плейлист DZIDZIO, насолоджуйтесь мелодіями, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'play_playlist', 'params': {'value': 'DZIDZIO'}}]}]
+GPT Етап 2 (команди + відповідь): Jarvis response: Відкриваю Spotify для вас, сер. Насолоджуйтесь музикою! | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': ''}}, {'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}]
 ========================================
 
 
 ========================================
-Час: 2026-02-25 12:07:42
-Команда користувача: графік відключення світла на сьогодні
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['blackout_schedule']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зараз одразу подивлюся графік відключень, сер. | Execution plan: [{'plugin': 'blackout_schedule', 'commands': [{'command': 'get_schedule', 'params': {'value': 'сьогодні'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-25 12:18:01
-Команда користувача: шу
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-25 12:18:12
-Команда користувача: розкажи шутку
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['entertainment']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Ось вам чудовий жарт для підняття настрою, сер. | Execution plan: [{'plugin': 'entertainment', 'commands': [{'command': 'tell_joke', 'params': {'value': ''}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-25 12:23:24
-Команда користувача: Детройт пожалуйста
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-25 12:23:58
-Команда користувача: Запусти Detroit пожалуйста
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Запускаю музику Detroit, насолоджуйтеся, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'play_music', 'params': {'value': 'Detroit'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 10:21:14
-Команда користувача: послушать Imagine Dragons включи пожалуйста
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зараз відтворю музику Imagine Dragons, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 16:58:29
-Команда користувача: Запусти Detroit become Human пожалуйста
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['entertainment']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Вибачте, сер, гру 'Detroit Become Human' наразі не можу запустити. | Execution plan: []
-========================================
-
-
-========================================
-Час: 2026-02-26 17:02:16
-Команда користувача: Запусти Detroit become Human
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 17:03:27
-Команда користувача: Запусти Detroit become Human
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 17:11:04
-Команда користувача: Запусти Detroit become Human
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['windows_programs']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Запускаю Detroit Become Human, насолоджуйтеся грою, сер. | Execution plan: [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Detroit Become Human'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:13:20
-Команда користувача: найди новини на рахунок Samsung s25 s26 Ultra пожалуйста
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Здійснюю пошук новин про Samsung, сер. | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'Samsung s25 s26 Ultra news'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:14:19
-Команда користувача: розкажи новини по моделі Samsung серія s26 і його старші браття які новини
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 17:17:52
-Команда користувача: розкажи новини про Samsung s26 Ultra який зараз
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Помилка ШІ асистента: Invalid format specifier \' "Тут коротко поясни крок за кроком, що хоче користувач і до якого плагіна це належить",\n  "isCommand": true_або_false,\n  "plugins": ["назва_плагіна_з_переліку_якщо_є"],\n  "confidence": 0.95\n\' for object of type \'str\''}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 17:18:49
-Команда користувача: Скажи які зараз є новини про Samsung s26 Ultra
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Шукаю найсвіжіші новини про Samsung s26 Ultra, сер. | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'Samsung s26 Ultra news'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:20:29
-Команда користувача: які зараз новини є по Самсунгу s26 Ultra
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 17:21:34
-Команда користувача: зараз є новини по Самсунгу s26 Ultra
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['news_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зараз дізнаємося останні новини про Samsung s26 Ultra, сер. | Execution plan: [{'plugin': 'news_search', 'commands': [{'command': 'read_news_topic', 'params': {'value': 'Samsung s26 Ultra'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:22:23
-Команда користувача: Слухай можеш знайти s26 ультра в інтернеті щоб купити його
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Шукаю найкращі пропозиції для вас, сер. | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'купити s26 ультра'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:22:37
-Команда користувача: короче ще найди фільм Валлі в інтернеті на ua
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Шукаю фільм Валлі на українських сайтах, сер. | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'фільм Валлі site:ua'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:23:30
-Команда користувача: Розкажи жарт Який
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['entertainment']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зараз розповім жарт, щоб розвеселити вас, сер. | Execution plan: [{'plugin': 'entertainment', 'commands': [{'command': 'tell_joke', 'params': {'value': ''}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:23:55
-Команда користувача: Чуєш а можеш короче цей Можеш будь ласка сказати Який графік світла на сьогодні
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['blackout_schedule']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Негайно подам графік світла на сьогодні, сер. | Execution plan: [{'plugin': 'blackout_schedule', 'commands': [{'command': 'get_schedule', 'params': {'value': 'blackout_schedule'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:26:12
-Команда користувача: новини в світі технологій
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['news_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Ось останні новини у світі технологій, сер. | Execution plan: [{'plugin': 'news_search', 'commands': [{'command': 'read_tech_news', 'params': {'value': ''}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:27:44
-Команда користувача: новини в Україні
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['news_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Очікую новини України, сер. Бажаю приємного читання! | Execution plan: [{'plugin': 'news_search', 'commands': [{'command': 'read_ukraine_news', 'params': {'value': ''}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:33:09
-Команда користувача: які новини по Самсунгу s26
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['news_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Очікуйте новини про технології, сер. | Execution plan: [{'plugin': 'news_search', 'commands': [{'command': 'read_tech_news', 'params': {'value': 'Samsung S26'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:33:36
-Команда користувача: знайди його
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Здійснюю пошук, сер. Бажаєте щось ще? | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'його'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:35:59
-Команда користувача: які новини по Самсунгу s26
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['news_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Очікую на новини про Самсунг S26, сер. | Execution plan: [{'plugin': 'news_search', 'commands': [{'command': 'read_tech_news', 'params': {'value': 'Самсунг S26'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:36:45
-Команда користувача: А де купити Samsung
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 17:43:39
-Команда користувача: новини по Самсунгу s26 Plus
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['news_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Ось новини про Самсунг S26 Plus, сер. | Execution plan: [{'plugin': 'news_search', 'commands': [{'command': 'read_news_topic', 'params': {'value': 'Самсунг S26 Plus'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:44:18
-Команда користувача: знайти його де його купити
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Шукаю інформацію, сер. Бажаєте допомогу? | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'де купити'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:46:46
-Команда користувача: яка інформація знайди інформацію про Samsung 26 Ultra новинки
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зачекайте, шукаю новини для сер. | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'Samsung 26 Ultra новинки'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:46:58
-Команда користувача: it новини по ньому
-GPT Етап 1 (вибір плагінів): ПОМИЛКА: cannot access local variable 'context_hint' where it is not associated with a value
-GPT Етап 2 (команди + відповідь): Етап 2 не досягнуто через помилку
-========================================
-
-
-========================================
-Час: 2026-02-26 17:47:21
-Команда користувача: які новини по Самсунгу s26 Plus
-GPT Етап 1 (вибір плагінів): ПОМИЛКА: cannot access local variable 'context_hint' where it is not associated with a value
-GPT Етап 2 (команди + відповідь): Етап 2 не досягнуто через помилку
-========================================
-
-
-========================================
-Час: 2026-02-26 17:48:31
-Команда користувача: які новини про Samsung s25 Plus s26 Plus то есть
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['news_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Очікую на свіжі техно-новини, сер. | Execution plan: [{'plugin': 'news_search', 'commands': [{'command': 'read_tech_news', 'params': {'value': 'Samsung S25 Plus S26 Plus'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:49:28
-Команда користувача: новини про Samsung s26 Plus
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['news_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Очікуйте останні новини про Samsung S26 Plus, сер. | Execution plan: [{'plugin': 'news_search', 'commands': [{'command': 'read_news_topic', 'params': {'value': 'Samsung S26 Plus'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:50:16
-Команда користувача: А де його можна купити знайди
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Знайдіть найкращі пропозиції, сер. | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'де купити Samsung S26 Plus'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:50:31
-Команда користувача: Дякую включи Imagine Dragons пожалуйста на Spotify
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Бажаю приємного прослуховування, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': True}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:54:45
-Команда користувача: Запусти Imagine Dragons на Spotify
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зачекайте, зараз запущу Imagine Dragons, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': ''}}, {'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:55:01
-Команда користувача: звук на 30% пожалуйста
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['sound_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Звук зменшено до 30%, сер. | Execution plan: [{'plugin': 'sound_control', 'commands': [{'command': 'set_volume', 'params': {'value': 30}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:55:15
-Команда користувача: Давай на 75
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['sound_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Гучність встановлено на 75%, сер.  | Execution plan: [{'plugin': 'sound_control', 'commands': [{'command': 'set_volume', 'params': {'value': 75}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:55:32
-Команда користувача: включи краще якийсь плейлист по цій по DZIDZIO
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Включаю плейлист DZIDZIO, сер. Бажаю приємного прослуховування! | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'play_playlist', 'params': {'value': 'DZIDZIO'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:57:27
-Команда користувача: Слушай сделай Spotify потише пожалуйста
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Відкриваю Spotify, сер. Бажаю приємного прослуховування! | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': ''}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 17:57:57
-Команда користувача: Я попросив зробити його тихіше Spotify
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зменшую гучність Spotify, сер. Бажаю приємного прослуховування! | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': ''}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:05:20
-Команда користувача: яскравість монітора другого зроби на 2
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Яскравість другого монітора змінена, сер. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': [2, 2]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:05:32
-Команда користувача: тільки це перший монітор
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 18:06:52
-Команда користувача: найяскравіший цього першого монітора на 21%
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Яскравість першого монітора встановлена, сер. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': [1, 21]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:07:35
-Команда користувача: зроби яскравість всіх моніторів на максимум на 100%
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Яскравість всіх моніторів встановлена на максимум, сер. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': ['all', 100]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:12:03
-Команда користувача: другого монітора на 100%
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Монітор другий налаштовано на 100%, сер. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': [2, 100]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:12:23
-Команда користувача: другий монітор на 42% а перший монітор на 100%
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Яскравість моніторів оновлено, сер. Бажаю приємного користування. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': [1, 100]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:12:42
-Команда користувача: яскравість другого монітора на 42
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Яскравість другого монітора встановлено на 42%, сер. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': [2, 42]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:13:05
-Команда користувача: яскравість першого монітора на 55% яскравість другого монітора на 30%
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Яскравість обох моніторів оновлено, сер. Гарного вам дня. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': [2, 30]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:17:25
-Команда користувача: яскравість першого монітора на 55 А друга монітора на 35%
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Яскравість моніторів налаштовано, сер. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': [[1, 55], [2, 35]]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:17:49
-Команда користувача: так яскравість першого монітора на 70%
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['monitor_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Яскравість першого монітора встановлено, сер. | Execution plan: [{'plugin': 'monitor_control', 'commands': [{'command': 'set_brightness', 'params': {'value': [1, 70]}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:22:57
-Команда користувача: напиши дивитися ва
+Час: 2026-03-13 16:57:07
+Команда користувача: напиши Привет Как дела Пошли гулять
 GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['keyboard_typing']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Звичайно, сер. Текст надруковано. | Execution plan: [{'plugin': 'keyboard_typing', 'commands': [{'command': 'type_text', 'params': {'value': 'дивитися ва'}}]}]
+GPT Етап 2 (команди + відповідь): Jarvis response: Ваше повідомлення вже готове до відправки, сер. | Execution plan: [{'plugin': 'keyboard_typing', 'commands': [{'command': 'type_text', 'params': {'value': 'Привет Как дела Пошли гулять'}}]}]
 ========================================
 
 
 ========================================
-Час: 2026-02-26 18:23:14
-Команда користувача: напиши дивитися Валлі українською мовою на сайті ua
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['browser_search']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зараз знайду для вас, сер. | Execution plan: [{'plugin': 'browser_search', 'commands': [{'command': 'search_google', 'params': {'value': 'Валлі українською мовою сайт'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:23:32
-Команда користувача: напиши короче Привіт що там Як справи підемо гуляти
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 18:25:16
-Команда користувача: напиши смотреть Валли на украинском ua
-GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
-GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
-========================================
-
-
-========================================
-Час: 2026-02-26 18:29:40
-Команда користувача: друкуй дивитися Валлі українською uakino
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['movie_recommendations']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Знайду та відкрию для вас 'Валлі', сер. | Execution plan: [{'plugin': 'movie_recommendations', 'commands': [{'command': 'search_movie', 'params': {'value': 'Валлі українською uakino'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-26 18:29:56
-Команда користувача: напиши дивитися Валлі українською ua
-GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['keyboard_typing']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Зараз друкую, сер. Бажаю приємного перегляду! | Execution plan: [{'plugin': 'keyboard_typing', 'commands': [{'command': 'type_text', 'params': {'value': 'дивитися Валлі українською ua'}}]}]
-========================================
-
-
-========================================
-Час: 2026-02-27 09:05:39
-Команда користувача: Spotify Imagine Dragon
+Час: 2026-03-13 16:57:23
+Команда користувача: включи на Spotify музику I
 GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
-GPT Етап 2 (команди + відповідь): Jarvis response: Відкриваю Spotify для вас, сер. Насолоджуйтесь музикою! | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': ''}}, {'command': 'search_artist', 'params': {'value': 'Imagine Dragon'}}]}]
+GPT Етап 2 (команди + відповідь): Jarvis response: Розпочинаю пошук виконавця за вашим запитом, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'I'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 16:57:54
+Команда користувача: слушать DZIDZIO
+GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
+GPT Етап 2 (команди + відповідь): Jarvis response: Запускаю композиції гурту DZIDZIO для вашого задоволення, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'DZIDZIO'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 17:01:47
+Команда користувача: хочу послушать imagine Drag
+GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
+GPT Етап 2 (команди + відповідь): Jarvis response: Вже готую добірку композицій Imagine Dragons для вас, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 17:02:07
+Команда користувача: теперь запустил ну еще не сбил жену
+GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
+GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
+========================================
+
+
+========================================
+Час: 2026-03-13 17:02:20
+Команда користувача: включи Imagine Dragons на Spotify
+GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
+GPT Етап 2 (команди + відповідь): Jarvis response: Ваш улюблений гурт уже лунає в ефірі, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 17:02:36
+Команда користувача: послушать DZIDZIO хочу
+GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
+GPT Етап 2 (команди + відповідь): Jarvis response: Розпочинаю відтворення композицій DZIDZIO спеціально для вас, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'DZIDZIO'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 17:03:03
+Команда користувача: Алексан включи на Spotify Imagine
+GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
+GPT Етап 2 (команди + відповідь): Jarvis response: Ваша композиція вже готується до відтворення, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'play_music', 'params': {'value': 'Imagine'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 17:05:18
+Команда користувача: Запусти Spotify
+GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
+GPT Етап 2 (команди + відповідь): Jarvis response: Ваш музичний сервіс вже готовий до використання, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': 'true'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 17:05:35
+Команда користувача: Запусти Spotify
+GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['music_control']}
+GPT Етап 2 (команди + відповідь): Jarvis response: Ваш Spotify вже запущено, насолоджуйтесь мелодіями, сер. | Execution plan: [{'plugin': 'music_control', 'commands': [{'command': 'open_spotify', 'params': {'value': 'start'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 17:07:29
+Команда користувача: напиши Привет Как дела Пошли гулять
+GPT Етап 1 (вибір плагінів): {'success': True, 'plugins': ['keyboard_typing']}
+GPT Етап 2 (команди + відповідь): Jarvis response: Ваше повідомлення вже надруковано, я до ваших послуг, сер. | Execution plan: [{'plugin': 'keyboard_typing', 'commands': [{'command': 'type_text', 'params': {'value': 'Привет Как дела Пошли гулять'}}]}]
+========================================
+
+
+========================================
+Час: 2026-03-13 17:08:00
+Команда користувача: Привет Как дела Пошли гулять
+GPT Етап 1 (вибір плагінів): {'success': False, 'error': 'Not a command', 'casual_talk': True}
+GPT Етап 2 (команди + відповідь): Команда не виконана - етап 2 не досягнуто
+========================================
+
+
+========================================
+Час: 2026-03-13 17:15:26
+Команда користувача: включи Imagine Dragons на Spotify
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}], 'jarvis_response': 'Звісно, сер. Вмикаю Imagine Dragons для вас.', 'selected_plugins': ['music_control']}
+========================================
+
+
+========================================
+Час: 2026-03-13 17:15:50
+Команда користувача: хочу послушать DZIDZIO
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'DZIDZIO'}}]}], 'jarvis_response': 'Звісно, сер. Вмикаю композиції DZIDZIO для вас.', 'selected_plugins': ['music_control']}
+========================================
+
+
+========================================
+Час: 2026-03-13 17:16:04
+Команда користувача: напиши Привет Как дела
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'keyboard_typing', 'commands': [{'command': 'type_text', 'params': {'value': 'Привет Как дела'}}]}], 'jarvis_response': 'Звісно, сер. Друкую ваш текст негайно.', 'selected_plugins': ['keyboard_typing']}
+========================================
+
+
+========================================
+Час: 2026-03-13 17:17:32
+Команда користувача: включи imagine Drag
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}], 'jarvis_response': 'Звісно, сер. Вмикаю Imagine Dragons для вас.', 'selected_plugins': ['music_control']}
+========================================
+
+
+========================================
+Час: 2026-03-13 17:17:44
+Команда користувача: включи DZIDZIO да
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'DZIDZIO'}}]}], 'jarvis_response': 'Звісно, сер. Вмикаю композиції гурту DZIDZIO для вас.', 'selected_plugins': ['music_control']}
+========================================
+
+
+========================================
+Час: 2026-03-13 17:17:57
+Команда користувача: напиши Привет Как дела
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'keyboard_typing', 'commands': [{'command': 'type_text', 'params': {'value': 'Привет Как дела'}}]}], 'jarvis_response': 'Звісно, сер. Друкую ваш текст негайно.', 'selected_plugins': ['keyboard_typing']}
+========================================
+
+
+========================================
+Час: 2026-03-13 17:18:08
+Команда користувача: ну шикарно
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': False, 'casual_talk': True, 'jarvis_response': 'Радий, що вам до вподоби, сер.'}
 ========================================
 

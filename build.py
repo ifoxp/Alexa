@@ -1,321 +1,261 @@
+"""
+build.py — збірка Alexa Assistant
+Що робить:
+  1. Збирає Python додаток через PyInstaller → dist/Alexa/Alexa.exe
+  2. Збирає C# AlexaSettings через dotnet publish → dist/Alexa/AlexaSettings.exe
+  3. Копіює config.json, assets/, plugins/ в dist/Alexa/
+  4. Прибирає тимчасові файли build/ та .spec
+
+Результат: папка dist/Alexa/ — готова до запуску, config.json вже там.
+"""
+
 import os
 import sys
 import shutil
 import subprocess
 from pathlib import Path
 
-# --- НАЛАШТУВАННЯ БІЛДУ ---
-EXE_NAME = "Alexa"
-MAIN_SCRIPT = "main.py"
-HIDE_CONSOLE = True
-ASSETS_DIR = "assets"
-PLUGINS_DIR = "plugins"
+# Fix encoding for Windows console
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-# --- ДИНАМІЧНІ ШЛЯХИ ---
-BASE_DIR = Path(__file__).resolve().parent
-ICON_FILE = BASE_DIR / ASSETS_DIR / "jarvis.ico"
+# ─── Налаштування ─────────────────────────────────────────────────────────────
+EXE_NAME        = "Alexa"
+MAIN_SCRIPT     = "main.py"
+CSHARP_DIR      = Path(__file__).resolve().parent / "AlexaSettings"
+CSHARP_EXE_NAME = "AlexaSettings.exe"
 
-def get_package_path(package_name):
-    """Знаходить абсолютний шлях до встановленого пакету."""
+BASE_DIR   = Path(__file__).resolve().parent
+DIST_DIR   = BASE_DIR / "dist" / EXE_NAME
+ICON_FILE  = BASE_DIR / "assets" / "jarvis.ico"
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def step(n: int, total: int, msg: str):
+    print(f"\n[{n}/{total}] {msg}")
+
+
+def get_package_path(package_name: str) -> Path | None:
     try:
         import importlib.util
         spec = importlib.util.find_spec(package_name)
         if spec and spec.origin:
             return Path(spec.origin).parent
-        return None
-    except Exception as e:
-        print(f"[ПОМИЛКА] Помилка під час пошуку пакету {package_name}: {e}")
-        return None
+    except Exception:
+        pass
+    return None
 
-def copy_csharp_settings_app():
-    """Копіює C# додаток налаштувань та його залежності в dist папку."""
-    print("Копіювання C# налаштувань...")
 
-    csharp_bin_dir = BASE_DIR / "AlexaS" / "AlexaS" / "bin" / "Release"
-    csharp_exe = csharp_bin_dir / "AlexaS.exe"
-    dist_dir = BASE_DIR / "dist"
-    target_exe = dist_dir / "AlexaSettingsApp.exe"
+# ─── Крок 1: Збірка Python (PyInstaller) ──────────────────────────────────────
+def build_python() -> bool:
+    step(1, 4, "Збірка Python → PyInstaller")
 
-    if not csharp_exe.exists():
-        print(f"УВАГА: C# EXE не знайдено за шляхом: {csharp_exe}")
-        print("   Спочатку збудуйте C# проект в Release режимі через Visual Studio")
-        return False
-
-    # Створюємо dist папку якщо не існує
-    dist_dir.mkdir(exist_ok=True)
-
-    # Копіюємо основний EXE
-    shutil.copy2(csharp_exe, target_exe)
-    print(f"OK: C# EXE скопійовано: {target_exe.name}")
-
-    # Копіюємо всі DLL залежності
-    dll_files = list(csharp_bin_dir.glob("*.dll"))
-    copied_dlls = []
-
-    for dll_file in dll_files:
-        target_dll = dist_dir / dll_file.name
-        shutil.copy2(dll_file, target_dll)
-        copied_dlls.append(dll_file.name)
-
-    if copied_dlls:
-        print(f"OK: Скопійовано {len(copied_dlls)} DLL залежностей:")
-        for dll in copied_dlls:
-            print(f"   - {dll}")
-
-    # Копіюємо config файл якщо є
-    config_file = csharp_bin_dir / "AlexaS.exe.config"
-    if config_file.exists():
-        target_config = dist_dir / "AlexaSettingsApp.exe.config"
-        shutil.copy2(config_file, target_config)
-        print(f"OK: Config скопійовано: {target_config.name}")
-
-    return True
-def copy_assets_folder():
-    """Копіює папку assets з усім вмістом поруч з EXE."""
-    print("Копіювання папки assets...")
-
-    assets_source = BASE_DIR / "assets"
-    dist_dir = BASE_DIR / "dist"
-    assets_target = dist_dir / "assets"
-
-    # 1. Перевіряємо, чи існує вихідна папка
-    if not assets_source.exists():
-        print(f"УВАГА: Папка assets не знайдена: {assets_source}")
-        return False
-
-    # 2. Створюємо dist папку, якщо вона ще не існує
-    dist_dir.mkdir(exist_ok=True)
-
-    # 3. Видаляємо стару папку assets у dist, щоб уникнути конфліктів при перекопіюванні
-    if assets_target.exists():
-        shutil.rmtree(assets_target)
-
-    try:
-        # 4. Копіюємо всю структуру папок та файлів
-        shutil.copytree(assets_source, assets_target)
-        
-        # Рахуємо кількість скопійованих файлів для звіту
-        all_files = list(assets_target.rglob("*"))
-        files_only = [f for f in all_files if f.is_file()]
-        
-        print(f"OK: Скопійовано папку assets ({len(files_only)} файлів успішно перенесено)")
-        return True
-    except Exception as e:
-        print(f"ПОМИЛКА при копіюванні assets: {e}")
-        return False
-def copy_plugins_folder():
-    """Копіює папку plugins поруч з EXE для користувачів."""
-    print("Копіювання папки plugins...")
-
-    plugins_source = BASE_DIR / "plugins"
-    dist_dir = BASE_DIR / "dist"
-    plugins_target = dist_dir / "plugins"
-
-    if not plugins_source.exists():
-        print(f"УВАГА: Папка plugins не знайдена: {plugins_source}")
-        return False
-
-    # Створюємо dist папку якщо не існує
-    dist_dir.mkdir(exist_ok=True)
-
-    # Видаляємо стару папку plugins якщо існує
-    if plugins_target.exists():
-        shutil.rmtree(plugins_target)
-
-    # Копіюємо всю папку plugins
-    shutil.copytree(plugins_source, plugins_target)
-
-    # Лічимо скільки файлів скопійовано
-    plugin_files = list(plugins_target.glob("*.py"))
-    print(f"OK: Скопійовано папку plugins з {len(plugin_files)} файлами:")
-    for plugin_file in plugin_files:
-        print(f"   - {plugin_file.name}")
-
-    return True
-
-def copy_config_file():
-    """Копіює файл config.json поруч з EXE у папку dist."""
-    print("Копіювання конфігураційного файлу...")
-
-    config_source = BASE_DIR / "config.json"
-    dist_dir = BASE_DIR / "dist"
-    config_target = dist_dir / "config.json"
-
-    # 1. Перевіряємо, чи існує вихідний файл
-    if not config_source.exists():
-        print(f"УВАГА: Файл конфігурації не знайдений: {config_source}")
-        # Для диплома можна додати створення дефолтного конфігу, якщо його немає
-        return False
-
-    # 2. Створюємо dist папку, якщо вона ще не існує
-    dist_dir.mkdir(exist_ok=True)
-
-    # 3. Перевіряємо чи потрібно оновити файл
-    if config_target.exists():
-        source_time = config_source.stat().st_mtime
-        target_time = config_target.stat().st_mtime
-        if source_time <= target_time:
-            print(f"OK: Файл {config_source.name} актуальний, копіювання не потрібно")
-            return True
-
-    try:
-        # 4. Копіюємо файл (shutil.copy2 зберігає метадані файлу)
-        shutil.copy2(config_source, config_target)
-        print(f"OK: Файл {config_source.name} успішно скопійовано до {dist_dir.name}")
-        return True
-    except Exception as e:
-        print(f"ПОМИЛКА при копіюванні конфігурації: {e}")
-        return False
-    
-def build():
-    """Основна функція для збірки проєкту."""
-    print("--- Початок збірки проєкту ---")
-
-    print("1/5. Пошук шляхів до моделей та даних...")
-
-    # --- ЗНАХОДИМО РЕСУРСИ PVPORCUPINE (НАДІЙНИЙ СПОСІБ) ---
     pvporcupine_path = get_package_path("pvporcupine")
     if not pvporcupine_path:
-        print("Неможливо продовжити: пакет 'pvporcupine' не знайдено.")
-        sys.exit(1)
+        print("  [ПОМИЛКА] Пакет pvporcupine не знайдено.")
+        return False
 
-    # Визначаємо шляхи до обох папок: lib та resources
-    pv_lib_path = pvporcupine_path / "lib"
-    pv_resources_path = pvporcupine_path / "resources"
-    print(f"   > Знайдено pvporcupine 'lib': {pv_lib_path}")
-    print(f"   > Знайдено pvporcupine 'resources': {pv_resources_path}")
+    pv_lib       = pvporcupine_path / "lib"
+    pv_resources = pvporcupine_path / "resources"
 
-    assets_path = ASSETS_DIR
-    plugins_path = PLUGINS_DIR
-
-    # --- ПЕРЕВІРКА НАЯВНОСТІ ФАЙЛІВ ПЕРЕД ЗБІРКОЮ ---
-    if not pv_lib_path.exists() or not pv_resources_path.exists():
-        print("[ПОМИЛКА] Критична помилка: папки 'lib' або 'resources' не знайдено всередині pvporcupine.")
-        sys.exit(1)
+    if not pv_lib.exists() or not pv_resources.exists():
+        print("  [ПОМИЛКА] Папки lib/resources всередині pvporcupine не знайдено.")
+        return False
 
     if not ICON_FILE.exists():
-        print(f"[ПОМИЛКА] Критична помилка: Файл іконки не знайдено за шляхом: {ICON_FILE}")
-        sys.exit(1)
+        print(f"  [ПОМИЛКА] Іконка не знайдена: {ICON_FILE}")
+        return False
 
-    # --- transcriber.py тепер в root папці, не потрібно додавати окремо ---
-
-    print("[OK] Шляхи успішно знайдено.")
-
-    print("2/5. Формування команди PyInstaller...")
-
-    # Список локальних Python модулів для додавання як дані
     local_modules = [
-        'audio_buffer.py',
-        'memory_manager.py',
-        'wake_word.py',
-        'tray_manager.py',
-        'smart_ai.py',
-        'config_manager.py',
-        'logger_config.py',
-        'command_manager.py',
-        'command_logger.py',
-        'transcriber.py',
-        'audio_player.py',
-        'smart_plugin_manager.py',
-        'settings.py'
+        'audio_buffer', 'memory_manager', 'wake_word', 'tray_manager',
+        'smart_ai', 'config_manager', 'logger_config', 'command_manager',
+        'command_logger', 'transcriber', 'audio_player',
+        'smart_plugin_manager', 'settings', 'media_controller',
     ]
 
-    command = [
+    cmd = [
         'pyinstaller',
         '--onedir',
         f'--name={EXE_NAME}',
         f'--icon={ICON_FILE}',
-        # Додаємо обидві папки pvporcupine
-        f'--add-data={pv_lib_path}{os.pathsep}pvporcupine/lib',
-        f'--add-data={pv_resources_path}{os.pathsep}pvporcupine/resources',
-        f'--add-data={assets_path}{os.pathsep}assets',
-        f'--add-data={plugins_path}{os.pathsep}plugins',
-        MAIN_SCRIPT
-    ]
-
-    # Додаємо локальні модулі як дані
-    for module in local_modules:
-        module_path = BASE_DIR / module
-        if module_path.exists():
-            command.extend([f'--add-data={module_path}{os.pathsep}.'])
-            command.extend([f'--hidden-import={module[:-3]}'])  # Видаляємо .py розширення
-
-    # Додаємо інші необхідні hidden imports
-    command.extend([
+        f'--add-data={pv_lib}{os.pathsep}pvporcupine/lib',
+        f'--add-data={pv_resources}{os.pathsep}pvporcupine/resources',
+        f'--add-data=assets{os.pathsep}assets',
+        f'--add-data=plugins{os.pathsep}plugins',
         '--hidden-import=pyaudio',
         '--hidden-import=pvporcupine',
         '--hidden-import=pystray',
         '--hidden-import=PIL',
-        '--hidden-import=threading',
-        '--hidden-import=json',
-        '--hidden-import=logging'
-    ])
-    if HIDE_CONSOLE:
-        command.append('--noconsole')
-        
-    print(f"   > Команда: {' '.join(command)}")
+        # Залежності плагінів (вшиваємо щоб не довантажувати при кожному запуску)
+        '--collect-all=spotipy',
+        '--collect-all=pycaw',
+        '--collect-all=pywin32',
+        '--hidden-import=win32gui',
+        '--hidden-import=win32api',
+        '--hidden-import=win32con',
+        '--hidden-import=win32process',
+        '--hidden-import=pywintypes',
+        '--hidden-import=keyboard',
+        '--hidden-import=screen_brightness_control',
+        '--noconsole',
+    ]
 
-    print("\n3/5. Очищення старої збірки та запуск процесу...")
+    for mod in local_modules:
+        py_file = BASE_DIR / f"{mod}.py"
+        if py_file.exists():
+            cmd += [f'--add-data={py_file}{os.pathsep}.', f'--hidden-import={mod}']
 
-    # Очищаємо старі файли dist/Alexa якщо є
-    alexa_dist_dir = BASE_DIR / "dist" / EXE_NAME
-    if alexa_dist_dir.exists():
-        print(f"   > Видаляємо стару збірку: {alexa_dist_dir}")
-        shutil.rmtree(alexa_dist_dir, ignore_errors=True)
+    cmd.append(MAIN_SCRIPT)
 
-    print("   > Запуск PyInstaller... Це може зайняти деякий час.")
-    try:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                   text=True, encoding='utf-8', errors='replace')
-        while True:
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                print(output.strip())
-        
-        if process.returncode != 0:
-             raise subprocess.CalledProcessError(process.returncode, command)
-             
-        print("[OK] Збірка успішно завершена.")
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"\n[ПОМИЛКА] ПОМИЛКА ПІД ЧАС ЗБІРКИ:")
-        if isinstance(e, FileNotFoundError):
-            print("   > Команда 'pyinstaller' не знайдена. Встановіть її: pip install pyinstaller")
-        else:
-            print(f"   > PyInstaller завершився з помилкою (код {e.returncode}).")
-        return
+    # Чистимо стару збірку
+    old = BASE_DIR / "dist" / EXE_NAME
+    if old.exists():
+        shutil.rmtree(old, ignore_errors=True)
 
-    print("\n4/6. Копіювання C# додатку налаштувань...")
-    #copy_csharp_settings_app()
+    print(f"  Запуск PyInstaller...")
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, encoding='utf-8', errors='replace'
+    )
+    for line in proc.stdout:
+        print(" ", line.rstrip())
+    proc.wait()
 
-    print("\n5/6. Копіювання папки plugins...")
-    copy_plugins_folder()
-    copy_config_file()
-    copy_assets_folder()
-    print("\n6/6. Очищення тимчасових файлів...")
-    try:
-        shutil.rmtree('build', ignore_errors=True)
-        os.remove(f'{EXE_NAME}.spec')
-        print("[OK] Тимчасові файли видалено.")
-    except OSError as e:
-        print(f"[УВАГА] Не вдалося видалити тимчасові файли: {e}")
+    if proc.returncode != 0:
+        print(f"  [ПОМИЛКА] PyInstaller завершився з кодом {proc.returncode}")
+        return False
 
-    print(f"\n--- Готово! ---")
-    print(f"Основний додаток: dist/{EXE_NAME}/{EXE_NAME}.exe")
-    print(f"Налаштування: dist/AlexaSettingsApp.exe")
-    print(f"Конфігурація: dist/config.json")
-    print(f"УВАГА: При --onedir структурі запускайте додаток з папки dist/{EXE_NAME}/")
-    print(f"Рекомендується створити ярлик на робочому столі для зручності")
+    print("  [OK] Python EXE зібрано.")
+    return True
+
+
+# ─── Крок 2: Збірка C# (dotnet publish) ───────────────────────────────────────
+def build_csharp() -> bool:
+    step(2, 4, "Збірка C# AlexaSettings → dotnet publish")
+
+    csproj = CSHARP_DIR / "AlexaSettings.csproj"
+    if not csproj.exists():
+        print(f"  [ПОМИЛКА] .csproj не знайдено: {csproj}")
+        return False
+
+    publish_dir = CSHARP_DIR / "bin" / "publish"
+
+    cmd = [
+        'dotnet', 'publish', str(csproj),
+        '-c', 'Release',
+        '-r', 'win-x64',
+        '--self-contained', 'false',
+        f'-o', str(publish_dir),
+        '/p:PublishSingleFile=true',
+        '/p:IncludeNativeLibrariesForSelfExtract=true',
+    ]
+
+    print("  Запуск dotnet publish...")
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if proc.returncode != 0:
+        print(f"  [ПОМИЛКА] dotnet publish завершився з кодом {proc.returncode}")
+        print(proc.stderr[-2000:] if proc.stderr else "")
+        return False
+
+    # Копіюємо AlexaSettings.exe в dist/Alexa/
+    src_exe = publish_dir / CSHARP_EXE_NAME
+    if not src_exe.exists():
+        # dotnet може назвати по-різному
+        exes = list(publish_dir.glob("*.exe"))
+        src_exe = exes[0] if exes else None
+
+    if not src_exe or not src_exe.exists():
+        print(f"  [ПОМИЛКА] {CSHARP_EXE_NAME} не знайдено в {publish_dir}")
+        return False
+
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src_exe, DIST_DIR / CSHARP_EXE_NAME)
+    print(f"  [OK] {CSHARP_EXE_NAME} скопійовано в dist/{EXE_NAME}/")
+    return True
+
+
+# ─── Крок 3: Копіювання config.json, assets, plugins ─────────────────────────
+def copy_extra_files():
+    step(3, 4, "Копіювання config.json, assets/, plugins/")
+
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+
+    # config.json — НЕ перезаписуємо якщо вже є (щоб не затерти налаштування)
+    src_cfg = BASE_DIR / "config.json"
+    dst_cfg = DIST_DIR / "config.json"
+    if src_cfg.exists() and not dst_cfg.exists():
+        shutil.copy2(src_cfg, dst_cfg)
+        print("  [OK] config.json скопійовано")
+    elif dst_cfg.exists():
+        print("  [--] config.json вже є в dist, не перезаписуємо")
+    else:
+        print("  [УВАГА] config.json не знайдено в корені проєкту")
+
+    # assets/
+    src_assets = BASE_DIR / "assets"
+    dst_assets = DIST_DIR / "assets"
+    if src_assets.exists():
+        if dst_assets.exists():
+            shutil.rmtree(dst_assets)
+        shutil.copytree(src_assets, dst_assets)
+        print(f"  [OK] assets/ скопійовано ({len(list(dst_assets.rglob('*')))} файлів)")
+    else:
+        print("  [УВАГА] assets/ не знайдено")
+
+    # plugins/
+    src_plugins = BASE_DIR / "plugins"
+    dst_plugins = DIST_DIR / "plugins"
+    if src_plugins.exists():
+        if dst_plugins.exists():
+            shutil.rmtree(dst_plugins)
+        shutil.copytree(src_plugins, dst_plugins)
+        print(f"  [OK] plugins/ скопійовано ({len(list(src_plugins.glob('*.py')))} плагінів)")
+    else:
+        print("  [УВАГА] plugins/ не знайдено")
+
+    # .spotify_cache — НЕ перезаписуємо якщо вже є (щоб не затерти токен)
+    src_cache = BASE_DIR / ".spotify_cache"
+    dst_cache = DIST_DIR / ".spotify_cache"
+    if src_cache.exists() and not dst_cache.exists():
+        shutil.copy2(src_cache, dst_cache)
+        print("  [OK] .spotify_cache скопійовано")
+
+
+# ─── Крок 4: Очищення тимчасових файлів ──────────────────────────────────────
+def cleanup():
+    step(4, 4, "Очищення тимчасових файлів")
+    shutil.rmtree(BASE_DIR / "build", ignore_errors=True)
+    spec = BASE_DIR / f"{EXE_NAME}.spec"
+    if spec.exists():
+        spec.unlink()
+    print("  [OK] Тимчасові файли видалено.")
+
+
+# ─── Точка входу ──────────────────────────────────────────────────────────────
+def main():
+    print("=" * 60)
+    print("  Alexa Assistant — білд")
+    print("=" * 60)
+
+    if not build_python():
+        print("\n[ЗУПИНЕНО] Помилка збірки Python.")
+        sys.exit(1)
+
+    if not build_csharp():
+        print("\n[УВАГА] C# не зібрано, продовжуємо без AlexaSettings.exe")
+
+    copy_extra_files()
+    cleanup()
+
+    print("\n" + "=" * 60)
+    print("  ГОТОВО!")
+    print(f"  Папка: dist/{EXE_NAME}/")
+    print(f"  Асистент:    dist/{EXE_NAME}/{EXE_NAME}.exe")
+    print(f"  Налаштування: dist/{EXE_NAME}/{CSHARP_EXE_NAME}")
+    print(f"  Конфіг:      dist/{EXE_NAME}/config.json")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1 and sys.argv[1] == "--copy-csharp-only":
-        # Тільки копіювання C# додатку без Python білду
-        print("--- Копіювання тільки C# додатку ---")
-        copy_csharp_settings_app()
-    else:
-        # Повний білд
-        build()
+    main()

@@ -15,7 +15,8 @@ def load_config():
         "picovoiceAccessKey": "",
         "wakeWordStandard": "porcupine",
         "sensitivity": 0.5,
-        "language": "uk-UA"
+        "languages": ["uk-UA", "ru-RU", "en-US"],
+        "microphoneDevice": ""
     }
 
     if not os.path.exists(CONFIG_FILE):

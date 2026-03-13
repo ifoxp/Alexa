@@ -10,48 +10,189 @@ from logger_config import get_logger
 logger = get_logger('smart_plugin_manager')
 
 
+def _find_python_executable() -> str:
+    """Знаходить системний python.exe (не Alexa.exe)."""
+    import shutil
+    # В exe-режимі sys.executable = Alexa.exe, шукаємо справжній python
+    if hasattr(sys, '_MEIPASS'):
+        python = shutil.which('python') or shutil.which('python3')
+        if python:
+            return python
+        # Шукаємо поруч з _MEIPASS (python311.dll є в _internal — там же python.exe не буде,
+        # але можна знайти через реєстр або стандартні шляхи)
+        for candidate in [
+            r'C:\Users\{}\AppData\Local\Programs\Python\Python311\python.exe'.format(os.environ.get('USERNAME', '')),
+            r'C:\Python311\python.exe', r'C:\Python310\python.exe',
+        ]:
+            if os.path.exists(candidate):
+                return candidate
+        return 'python'  # fallback
+    return sys.executable
+
+
+def _pip_install(package: str) -> bool:
+    """Встановлює пакет через pip і повертає True якщо успішно."""
+    try:
+        import subprocess
+        # Деякі модулі мають іншу назву пакета для pip
+        PIP_ALIASES = {
+            'win32gui': 'pywin32',
+            'win32api': 'pywin32',
+            'win32con': 'pywin32',
+            'pywintypes': 'pywin32',
+        }
+        pip_package = PIP_ALIASES.get(package, package)
+        python = _find_python_executable()
+        logger.info(f"Auto-installing missing package: {pip_package} via {python}")
+        result = subprocess.run(
+            [python, '-m', 'pip', 'install', pip_package, '--quiet'],
+            capture_output=True, text=True, timeout=60,
+            creationflags=0x08000000 if os.name == 'nt' else 0  # CREATE_NO_WINDOW
+        )
+        if result.returncode == 0:
+            logger.info(f"Successfully installed: {package}")
+            # pywin32 потребує post-install для реєстрації DLL
+            if pip_package == 'pywin32':
+                try:
+                    r = subprocess.run([python, '-c',
+                        'import sysconfig; print(sysconfig.get_path("scripts"))'],
+                        capture_output=True, text=True, timeout=5,
+                        creationflags=0x08000000 if os.name == 'nt' else 0)
+                    if r.returncode == 0:
+                        post_install = os.path.join(r.stdout.strip(), 'pywin32_postinstall.py')
+                        if os.path.exists(post_install):
+                            subprocess.run([python, post_install, '-install'],
+                                capture_output=True, text=True, timeout=30,
+                                creationflags=0x08000000 if os.name == 'nt' else 0)
+                            logger.info("pywin32 post-install completed")
+                except Exception as pe:
+                    logger.warning(f"pywin32 post-install failed: {pe}")
+            return True
+        else:
+            logger.error(f"pip install {package} failed: {result.stderr}")
+            return False
+    except Exception as e:
+        logger.error(f"pip install {package} error: {e}")
+        return False
+
+
+def _add_user_site_packages():
+    """Додає site-packages системного Python до sys.path (де pip встановлює пакети)."""
+    try:
+        import subprocess
+        python = _find_python_executable()
+        result = subprocess.run(
+            [python, '-c', 'import site, json; print(json.dumps(site.getsitepackages() + [site.getusersitepackages()]))'],
+            capture_output=True, text=True, timeout=10,
+            creationflags=0x08000000 if os.name == 'nt' else 0  # CREATE_NO_WINDOW
+        )
+        if result.returncode == 0:
+            import json
+            for path in json.loads(result.stdout.strip()):
+                if os.path.exists(path) and path not in sys.path:
+                    sys.path.insert(0, path)
+    except Exception:
+        pass
+
+
+def _extract_missing_module(error_msg: str) -> str | None:
+    """Витягує назву відсутнього модуля з повідомлення ImportError."""
+    import re
+    m = re.search(r"No module named '([^']+)'", error_msg)
+    if m:
+        # Беремо тільки верхньорівневий пакет (screen_brightness_control, не sub.module)
+        return m.group(1).split('.')[0]
+    return None
+
+
+def _load_plugin_file(plugins_dir: str, filename: str) -> List[type]:
+    """Завантажує один файл плагіна, при потребі встановлює залежності."""
+    plugin_path = os.path.join(plugins_dir, filename)
+    full_module_name = f'plugins.{filename[:-3]}'
+
+    for attempt in range(2):
+        try:
+            # Очищаємо кеш модуля перед повторною спробою
+            if full_module_name in sys.modules:
+                del sys.modules[full_module_name]
+
+            spec = importlib.util.spec_from_file_location(
+                full_module_name, plugin_path, submodule_search_locations=[])
+            if spec is None or spec.loader is None:
+                return []
+
+            module = importlib.util.module_from_spec(spec)
+            module.__package__ = 'plugins'
+            sys.modules[full_module_name] = module
+            spec.loader.exec_module(module)
+
+            classes = []
+            for name, obj in inspect.getmembers(module, inspect.isclass):
+                if obj != SmartPlugin and issubclass(obj, SmartPlugin):
+                    classes.append(obj)
+            return classes
+
+        except ImportError as e:
+            if attempt == 0:
+                missing = _extract_missing_module(str(e))
+                if missing:
+                    _add_user_site_packages()
+                    installed = _pip_install(missing)
+                    _add_user_site_packages()
+                    logger.info(f"sys.path after install: {[p for p in sys.path if 'site-packages' in p]}")
+                    if installed:
+                        continue  # друга спроба
+            logger.error(f"Failed to load plugin file {filename}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Failed to load plugin file {filename}: {e}")
+            return []
+
+    return []
+
+
 def discover_plugins() -> List[type]:
-    """Автоматично знаходить всі плагіни в папці plugins/"""
+    """Автоматично знаходить всі плагіни в папці plugins/ (для exe-режиму)."""
     plugin_classes = []
 
-    # Визначаємо папку plugins
-    if hasattr(sys, '_MEIPASS'):
-        # Запакований exe
-        plugins_dir = os.path.join(sys._MEIPASS, 'plugins')
-    else:
-        # Розробка
-        plugins_dir = os.path.join(os.path.dirname(__file__), 'plugins')
-
-
+    # Папка з .py файлами плагінів (поруч з exe)
+    plugins_dir = os.path.join(os.path.dirname(sys.executable), 'plugins')
     if not os.path.exists(plugins_dir):
+        logger.error(f"plugins/ not found at: {plugins_dir}")
         return plugin_classes
 
-    # Сканування всіх .py файлів в папці plugins
-    for filename in os.listdir(plugins_dir):
-        if filename.endswith('.py') and not filename.startswith('_'):
-            plugin_path = os.path.join(plugins_dir, filename)
-            module_name = filename[:-3]  # видаляємо .py
+    # Додаємо _internal/ до sys.path — там PyInstaller пакує вбудовані залежності
+    exe_dir = os.path.dirname(sys.executable)
+    internal_dir = os.path.join(exe_dir, '_internal')
+    for d in [exe_dir, internal_dir]:
+        if os.path.exists(d) and d not in sys.path:
+            sys.path.insert(0, d)
 
-            try:
+    # Також додаємо системні site-packages одразу
+    _add_user_site_packages()
 
-                # Завантажуємо модуль
-                spec = importlib.util.spec_from_file_location(module_name, plugin_path)
-                if spec is None or spec.loader is None:
-                    continue
+    # Реєструємо пакет plugins у sys.modules щоб працював from .base_plugin import ...
+    if 'plugins' not in sys.modules:
+        import types
+        plugins_pkg = types.ModuleType('plugins')
+        plugins_pkg.__path__ = [plugins_dir]
+        plugins_pkg.__package__ = 'plugins'
+        sys.modules['plugins'] = plugins_pkg
 
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
+    # Завантажуємо base_plugin першим
+    base_plugin_path = os.path.join(plugins_dir, 'base_plugin.py')
+    if os.path.exists(base_plugin_path) and 'plugins.base_plugin' not in sys.modules:
+        spec = importlib.util.spec_from_file_location('plugins.base_plugin', base_plugin_path,
+            submodule_search_locations=[])
+        base_module = importlib.util.module_from_spec(spec)
+        base_module.__package__ = 'plugins'
+        sys.modules['plugins.base_plugin'] = base_module
+        spec.loader.exec_module(base_module)
 
-                # Знаходимо всі класи які наслідують SmartPlugin
-                for name, obj in inspect.getmembers(module, inspect.isclass):
-                    if (obj != SmartPlugin and
-                        issubclass(obj, SmartPlugin) and
-                        obj.__module__ == module_name):
-                        plugin_classes.append(obj)
-
-            except Exception as e:
-                logger.error(f"Failed to load plugin file {filename}: {str(e)}")
-                continue
+    # Сканування всіх .py файлів
+    for filename in sorted(os.listdir(plugins_dir)):
+        if filename.endswith('.py') and not filename.startswith('_') and filename != 'base_plugin.py':
+            plugin_classes.extend(_load_plugin_file(plugins_dir, filename))
 
     return plugin_classes
 
@@ -65,13 +206,15 @@ class SmartPluginManager:
 
     def load_plugins(self):
         """Завантажує всі доступні плагіни."""
-        # Тимчасово використовуємо стару систему для стабільності
-        try:
-            from plugins import AVAILABLE_PLUGINS
-            available_plugins = AVAILABLE_PLUGINS
-        except ImportError:
-            # Якщо не вдається - використовуємо автозавантаження
+        if hasattr(sys, '_MEIPASS'):
+            # В exe-режимі плагіни як .py файли поруч з exe — завантажуємо динамічно
             available_plugins = discover_plugins()
+        else:
+            try:
+                from plugins import AVAILABLE_PLUGINS
+                available_plugins = AVAILABLE_PLUGINS
+            except ImportError:
+                available_plugins = discover_plugins()
 
 
         for plugin_class in available_plugins:

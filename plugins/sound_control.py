@@ -7,8 +7,6 @@ from typing import Dict, Any, List, Tuple
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume, ISimpleAudioVolume
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
-import win32gui
-import win32process
 from .base_plugin import SmartPlugin
 
 class SystemControlPlugin(SmartPlugin):
@@ -129,6 +127,8 @@ class SystemControlPlugin(SmartPlugin):
     async def _set_active_app_volume(self, level: int) -> Dict[str, Any]:
         """Встановлює гучність для активного вікна."""
         try:
+            import win32gui
+            import win32process
             hwnd = win32gui.GetForegroundWindow()
             _, active_pid = win32process.GetWindowThreadProcessId(hwnd)
             window_title = win32gui.GetWindowText(hwnd) or "Unknown Window"

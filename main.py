@@ -41,6 +41,23 @@ def create_porcupine_model(access_key, model_path, sensitivity, is_custom):
             sensitivities=[sensitivity]
         )
 
+def get_microphone_index(audio_instance, device_name: str):
+    """
+    Повертає індекс мікрофону за його назвою.
+    Якщо назва порожня або не знайдена — повертає None (системний за замовчуванням).
+    """
+    if not device_name:
+        return None
+    count = audio_instance.get_device_count()
+    for i in range(count):
+        info = audio_instance.get_device_info_by_index(i)
+        if info.get('maxInputChannels', 0) > 0 and device_name.lower() in info['name'].lower():
+            logger.info("Знайдено мікрофон", extra={'index': i, 'device_name': info['name']})
+            return i
+    logger.warning("Мікрофон не знайдено, використовую системний", extra={'requested': device_name})
+    return None
+
+
 def listen_loop(tray_manager, handler, porcupine, buffered_stream, config):
     """
     Основний цикл, що виконується в окремому потоці з буферизованим потоком.
@@ -107,15 +124,21 @@ def main():
 
             # --- ІНІЦІАЛІЗАЦІЯ ШІ АСИСТЕНТА ---
             openai_key = config.get("openaiApiKey", "").strip()
-            ai_enabled = config.get("aiAssistantEnabled", True)
 
-            if ai_enabled and openai_key and openai_key != "YOUR_OPENAI_API_KEY_HERE":
+            if openai_key and openai_key != "YOUR_OPENAI_API_KEY_HERE":
                 if smart_ai.initialize_smart_assistant(openai_key):
                     logger.info("Smart AI assistant enabled")
+                    # Прогріваємо плагіни при старті щоб перша команда не мала затримки
+                    try:
+                        from smart_plugin_manager import SmartPluginManager
+                        smart_ai.smart_assistant.plugin_manager = SmartPluginManager()
+                        logger.info("Plugin manager pre-initialized at startup")
+                    except Exception as e:
+                        logger.warning("Plugin manager pre-init failed", extra={'error': str(e)})
                 else:
                     logger.warning("Failed to initialize AI assistant")
             else:
-                logger.info("AI assistant disabled - using traditional commands only")
+                logger.info("OpenAI API key not set — AI assistant disabled")
 
             # --- ОНОВЛЕНА ЛОГІКА ІНІЦІАЛІЗАЦІЇ PORCUPINE З КЕШЕМ ---
             access_key = config["picovoiceAccessKey"]
@@ -171,13 +194,23 @@ def main():
             handler = WakeWordHandler(tray)
             audio = resource_mgr.add(pyaudio.PyAudio())
 
+            # Визначаємо індекс мікрофону з конфігу
+            mic_device_name = config.get("microphoneDevice", "")
+            mic_index = get_microphone_index(audio, mic_device_name)
+
+            logger.info("Аудіо пристрій", extra={
+                'microphoneDevice': mic_device_name or '(системний за замовчуванням)',
+                'input_device_index': mic_index
+            })
+
             # Створюємо звичайний stream
             raw_stream = audio.open(
                 format=settings.FORMAT,
                 channels=settings.CHANNELS,
                 rate=porcupine.sample_rate,
                 input=True,
-                frames_per_buffer=512  # Менший розмір для кращої responsiveness
+                input_device_index=mic_index,
+                frames_per_buffer=512
             )
 
             # Обгортаємо в буферизований stream

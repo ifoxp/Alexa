@@ -8,15 +8,38 @@ from logger_config import get_logger
 
 logger = get_logger('transcriber')
 
+def _find_sr_microphone_index(device_name: str):
+    """Знаходить device_index для speech_recognition за назвою мікрофону з config.json."""
+    if not device_name:
+        return None
+    for i, name in enumerate(sr.Microphone.list_microphone_names()):
+        if device_name.lower() in name.lower():
+            return i
+    return None
+
+
 class OnlineTranscriber:
     def __init__(self):
         self.recognizer = sr.Recognizer()
+
+        # Беремо мікрофон і мови з config.json
+        import config_manager as cfg
+        try:
+            _config = cfg.load_config()
+            self.languages = _config.get("languages", ["uk-UA", "ru-RU", "en-US"])
+            if not self.languages:
+                self.languages = ["uk-UA", "ru-RU", "en-US"]
+            mic_name = _config.get("microphoneDevice", "")
+        except Exception:
+            self.languages = ["uk-UA", "ru-RU", "en-US"]
+            mic_name = ""
+
+        mic_index = _find_sr_microphone_index(mic_name)
         self.microphone = sr.Microphone(
+            device_index=mic_index,
             sample_rate=settings.RATE,
             chunk_size=settings.CHUNK
         )
-        # Multi-language support
-        self.languages = ["uk-UA", "ru-RU", "en-US"]
         self.current_language_index = 0
         self.current_language = self.languages[0]
         

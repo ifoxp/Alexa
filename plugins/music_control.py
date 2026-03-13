@@ -22,12 +22,21 @@ class MusicControlPlugin(SmartPlugin):
 
     def _init_spotify(self):
         try:
+            import sys as _sys
+            # Зберігаємо .cache поряд з exe (або поряд з плагіном при розробці)
+            if hasattr(_sys, '_MEIPASS'):
+                _cache_dir = os.path.dirname(_sys.executable)
+            else:
+                _cache_dir = os.path.dirname(os.path.dirname(__file__))
+            _cache_path = os.path.join(_cache_dir, '.spotify_cache')
+
             scope = "user-modify-playback-state user-read-playback-state"
             auth_manager = SpotifyOAuth(
                 client_id=SPOTIFY_CLIENT_ID,
                 client_secret=SPOTIFY_CLIENT_SECRET,
                 redirect_uri=SPOTIFY_REDIRECT_URI,
                 scope=scope,
+                cache_path=_cache_path,
                 open_browser=False
             )
             self.sp = spotipy.Spotify(auth_manager=auth_manager)
@@ -45,10 +54,10 @@ class MusicControlPlugin(SmartPlugin):
     @property
     def commands(self) -> Dict[str, str]:
         return {
-            "play_music": "включити конкретний трек або пісню",
-            "play_playlist": "включити плейлист за назвою",
-            "search_artist": "включити музику конкретного виконавця",
-            "play_genre": "включити музику певного жанру (через плейлисти)",
+            "play_music": "включити конкретний трек або пісню (коли відомий трек)",
+            "play_playlist": "включити плейлист за точною назвою плейлиста (НЕ назва виконавця)",
+            "search_artist": "включити всю музику виконавця або гурту (Imagine Dragons, Drake, тощо)",
+            "play_genre": "включити музику певного жанру: поп, рок, хіп-хоп тощо",
             "pause_music": "поставити на паузу або відновити",
             "next_track": "увімкнути наступний трек",
             "prev_track": "увімкнути попередній трек",
