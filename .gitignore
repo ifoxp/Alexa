@@ -228,3 +228,7 @@ commands_log.txt
 
 .logs/
 logs/
+
+.spotify_cache
+..spotify_cache
+spotify_cache
