@@ -31,13 +31,25 @@ namespace AlexaSettings
             lblMicrophoneDesc = new Label();
             lblMicrophone = new Label();
             cmbMicrophone = new ComboBox();
+            lblMicVolumeLabel = new Label();
+            trackMicVolume = new TrackBar();
+            lblMicVolumeValue = new Label();
+            lblMicVolumeHint = new Label();
+            lblMicTestTitle = new Label();
+            pbMicLevel = new ProgressBar();
+            lblMicLevelHint = new Label();
+            btnMicTest = new Button();
 
             // Tokens
             lblPicovoiceKey = new Label();
             txtPicovoiceKey = new TextBox();
+            btnPicovoiceEye = new Button();
+            btnPicovoiceCopy = new Button();
             lblPicovoiceKeyHint = new Label();
             lblOpenAiKey = new Label();
             txtOpenAiKey = new TextBox();
+            btnOpenAiEye = new Button();
+            btnOpenAiCopy = new Button();
             lblOpenAiKeyHint = new Label();
 
             // WakeWord
@@ -89,6 +101,7 @@ namespace AlexaSettings
 
             tabControl.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)trackSensitivity).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)trackMicVolume).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudCommandTimeout).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudContinuousListen).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudSilenceDetect).BeginInit();
@@ -146,7 +159,62 @@ namespace AlexaSettings
             cmbMicrophone.Size = new Size(530, 26);
             cmbMicrophone.DropDownStyle = ComboBoxStyle.DropDownList;
 
-            tabMicrophone.Controls.AddRange(new Control[] { lblMicrophoneDesc, lblMicrophone, cmbMicrophone });
+            // Mic volume slider
+            lblMicVolumeLabel.Text = "Гучність мікрофону:";
+            lblMicVolumeLabel.Location = new Point(lx, 130);
+            lblMicVolumeLabel.AutoSize = true;
+            lblMicVolumeLabel.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            trackMicVolume.Location = new Point(lx, 152);
+            trackMicVolume.Size = new Size(450, 35);
+            trackMicVolume.Minimum = 0;
+            trackMicVolume.Maximum = 100;
+            trackMicVolume.TickFrequency = 10;
+            trackMicVolume.Value = 100;
+            trackMicVolume.Scroll += trackMicVolume_Scroll;
+
+            lblMicVolumeValue.Text = "100%";
+            lblMicVolumeValue.Location = new Point(lx + 462, 162);
+            lblMicVolumeValue.AutoSize = true;
+            lblMicVolumeValue.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+
+            lblMicVolumeHint.Text = "Змінює системну гучність мікрофону (Windows). Зберігається в config.json і застосовується при старті.";
+            lblMicVolumeHint.Location = new Point(lx, 192);
+            lblMicVolumeHint.Size = new Size(530, 20);
+            lblMicVolumeHint.ForeColor = hintColor;
+
+            // Mic test section
+            lblMicTestTitle.Text = "Тест мікрофону:";
+            lblMicTestTitle.Location = new Point(lx, 228);
+            lblMicTestTitle.AutoSize = true;
+            lblMicTestTitle.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            pbMicLevel.Location = new Point(lx, 250);
+            pbMicLevel.Size = new Size(450, 22);
+            pbMicLevel.Minimum = 0;
+            pbMicLevel.Maximum = 100;
+            pbMicLevel.Value = 0;
+            pbMicLevel.Style = ProgressBarStyle.Continuous;
+            pbMicLevel.ForeColor = Color.FromArgb(37, 150, 90);
+
+            btnMicTest.Text = "▶ Почати тест";
+            btnMicTest.Location = new Point(lx + 456, 248);
+            btnMicTest.Size = new Size(74, 26);
+            btnMicTest.FlatStyle = FlatStyle.Flat;
+            btnMicTest.Font = new Font("Segoe UI", 8.5f);
+            btnMicTest.Cursor = Cursors.Hand;
+            btnMicTest.Click += btnMicTest_Click;
+
+            lblMicLevelHint.Text = "Говоріть в мікрофон — шкала покаже рівень гучності як чує його програма.";
+            lblMicLevelHint.Location = new Point(lx, 278);
+            lblMicLevelHint.Size = new Size(530, 20);
+            lblMicLevelHint.ForeColor = hintColor;
+
+            tabMicrophone.Controls.AddRange(new Control[] {
+                lblMicrophoneDesc, lblMicrophone, cmbMicrophone,
+                lblMicVolumeLabel, trackMicVolume, lblMicVolumeValue, lblMicVolumeHint,
+                lblMicTestTitle, pbMicLevel, btnMicTest, lblMicLevelHint
+            });
 
             // ==============================
             // TAB: ТОКЕНИ
@@ -157,29 +225,71 @@ namespace AlexaSettings
             lblPicovoiceKey.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
             txtPicovoiceKey.Location = new Point(lx, 38);
-            txtPicovoiceKey.Size = new Size(530, 26);
+            txtPicovoiceKey.Size = new Size(462, 26);
+            txtPicovoiceKey.UseSystemPasswordChar = true;
+
+            btnPicovoiceEye.Text = "👁";
+            btnPicovoiceEye.Location = new Point(lx + 466, 37);
+            btnPicovoiceEye.Size = new Size(30, 28);
+            btnPicovoiceEye.FlatStyle = FlatStyle.Flat;
+            btnPicovoiceEye.FlatAppearance.BorderSize = 1;
+            btnPicovoiceEye.Font = new Font("Segoe UI Emoji", 11f);
+            btnPicovoiceEye.Cursor = Cursors.Hand;
+            btnPicovoiceEye.Tag = txtPicovoiceKey;
+            btnPicovoiceEye.Click += btnEye_Click;
+
+            btnPicovoiceCopy.Text = "📋";
+            btnPicovoiceCopy.Location = new Point(lx + 500, 37);
+            btnPicovoiceCopy.Size = new Size(30, 28);
+            btnPicovoiceCopy.FlatStyle = FlatStyle.Flat;
+            btnPicovoiceCopy.FlatAppearance.BorderSize = 1;
+            btnPicovoiceCopy.Font = new Font("Segoe UI Emoji", 11f);
+            btnPicovoiceCopy.Cursor = Cursors.Hand;
+            btnPicovoiceCopy.Tag = txtPicovoiceKey;
+            btnPicovoiceCopy.Click += btnCopy_Click;
 
             lblPicovoiceKeyHint.Text = "Ключ для Picovoice — розпізнавання слова-тригера (\"Alexa\", \"Jarvis\" тощо). Отримати на picovoice.ai.";
-            lblPicovoiceKeyHint.Location = new Point(lx, 68);
+            lblPicovoiceKeyHint.Location = new Point(lx, 70);
             lblPicovoiceKeyHint.Size = new Size(530, 32);
             lblPicovoiceKeyHint.ForeColor = hintColor;
 
             lblOpenAiKey.Text = "Gemini API Key:";
-            lblOpenAiKey.Location = new Point(lx, 115);
+            lblOpenAiKey.Location = new Point(lx, 118);
             lblOpenAiKey.AutoSize = true;
             lblOpenAiKey.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
-            txtOpenAiKey.Location = new Point(lx, 135);
-            txtOpenAiKey.Size = new Size(530, 26);
+            txtOpenAiKey.Location = new Point(lx, 138);
+            txtOpenAiKey.Size = new Size(462, 26);
+            txtOpenAiKey.UseSystemPasswordChar = true;
+
+            btnOpenAiEye.Text = "👁";
+            btnOpenAiEye.Location = new Point(lx + 466, 137);
+            btnOpenAiEye.Size = new Size(30, 28);
+            btnOpenAiEye.FlatStyle = FlatStyle.Flat;
+            btnOpenAiEye.FlatAppearance.BorderSize = 1;
+            btnOpenAiEye.Font = new Font("Segoe UI Emoji", 11f);
+            btnOpenAiEye.Cursor = Cursors.Hand;
+            btnOpenAiEye.Tag = txtOpenAiKey;
+            btnOpenAiEye.Click += btnEye_Click;
+
+            btnOpenAiCopy.Text = "📋";
+            btnOpenAiCopy.Location = new Point(lx + 500, 137);
+            btnOpenAiCopy.Size = new Size(30, 28);
+            btnOpenAiCopy.FlatStyle = FlatStyle.Flat;
+            btnOpenAiCopy.FlatAppearance.BorderSize = 1;
+            btnOpenAiCopy.Font = new Font("Segoe UI Emoji", 11f);
+            btnOpenAiCopy.Cursor = Cursors.Hand;
+            btnOpenAiCopy.Tag = txtOpenAiKey;
+            btnOpenAiCopy.Click += btnCopy_Click;
 
             lblOpenAiKeyHint.Text = "Ключ для ШІ-асистента (Gemini). Якщо порожньо або ШІ вимкнений — Gemini не використовується.\nОтримати на aistudio.google.com.";
-            lblOpenAiKeyHint.Location = new Point(lx, 165);
+            lblOpenAiKeyHint.Location = new Point(lx, 170);
             lblOpenAiKeyHint.Size = new Size(530, 34);
             lblOpenAiKeyHint.ForeColor = hintColor;
 
             tabTokens.Controls.AddRange(new Control[] {
-                lblPicovoiceKey, txtPicovoiceKey, lblPicovoiceKeyHint,
-                lblOpenAiKey, txtOpenAiKey, lblOpenAiKeyHint
+                lblPicovoiceKey, txtPicovoiceKey, btnPicovoiceEye, btnPicovoiceCopy, lblPicovoiceKeyHint,
+                lblOpenAiKey, txtOpenAiKey, btnOpenAiEye, btnOpenAiCopy, lblOpenAiKeyHint
             });
 
             // ==============================
@@ -449,6 +559,7 @@ namespace AlexaSettings
 
             tabControl.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)trackSensitivity).EndInit();
+            ((System.ComponentModel.ISupportInitialize)trackMicVolume).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudCommandTimeout).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudContinuousListen).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudSilenceDetect).EndInit();
@@ -464,9 +575,15 @@ namespace AlexaSettings
 
         private Label lblMicrophoneDesc, lblMicrophone;
         private ComboBox cmbMicrophone;
+        private Label lblMicVolumeLabel, lblMicVolumeValue, lblMicVolumeHint;
+        private TrackBar trackMicVolume;
+        private Label lblMicTestTitle, lblMicLevelHint;
+        private ProgressBar pbMicLevel;
+        private Button btnMicTest;
 
         private Label lblPicovoiceKey, lblPicovoiceKeyHint, lblOpenAiKey, lblOpenAiKeyHint;
         private TextBox txtPicovoiceKey, txtOpenAiKey;
+        private Button btnPicovoiceEye, btnPicovoiceCopy, btnOpenAiEye, btnOpenAiCopy;
 
         private RadioButton rbStandardWakeWord, rbCustomWakeWord;
         private Label lblWakeWordStandardLabel, lblCustomWakeWordPath, lblCustomWakeWordHint;

@@ -73,12 +73,17 @@ class WakeWordHandler:
             silence_timeout = getattr(settings, 'SILENCE_TIMEOUT', 5.0)
 
             try:
+                # ⏱ ДОДАНО ТАЙМЕР РОЗПІЗНАВАННЯ
+                transcribe_start = time.time()
                 # Використовуємо нову async функцію з детекцією тиші
                 transcript = await self.transcriber.listen_with_silence_detection(
                     max_timeout=remaining_time,
                     silence_timeout=silence_timeout
                 )
-
+                # ⏱ ВИВОДИМО РЕЗУЛЬТАТ
+                transcribe_duration = time.time() - transcribe_start
+                print(f"[⏱ ТАЙМЕР] Слухання та розпізнавання тексту зайняло: {transcribe_duration:.2f} сек")
+                
                 if transcript:
                     transcript_text = transcript.strip()
                     print(f"🔥 Ви сказали: {transcript_text}")

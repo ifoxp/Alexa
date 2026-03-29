@@ -5,6 +5,7 @@ import winsound
 from logger_config import get_logger
 import pygame
 import subprocess
+import time
 import tempfile
 import edge_tts
 
@@ -89,7 +90,7 @@ class EdgeTTS:
 
                     # Чекаємо поки закінчиться відтворення
                     while pygame.mixer.music.get_busy():
-                        pygame.time.Clock().tick(10)
+                        time.sleep(0.1)
 
                     logger.debug(f"Edge TTS played: {text[:50]}...")
                     return True

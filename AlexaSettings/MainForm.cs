@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using NAudio.CoreAudioApi;
+using NAudio.Wave;
 using Newtonsoft.Json;
 
 namespace AlexaSettings
@@ -15,6 +16,12 @@ namespace AlexaSettings
         // Ключ реєстру для автозапуску
         private const string AutostartRegKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private const string AutostartAppName = "AlexaAssistant";
+
+        // VU-метр
+        private WaveInEvent? _micTestCapture;
+        private System.Windows.Forms.Timer? _micTestTimer;
+        private float _currentMicLevel;
+        private bool _micTestRunning;
 
         public MainForm()
         {
@@ -93,6 +100,48 @@ namespace AlexaSettings
             cmbMicrophone.SelectedIndex = 0;
         }
 
+        private void LoadMicVolume()
+        {
+            try
+            {
+                string? selectedMic = cmbMicrophone.SelectedIndex > 0 ? cmbMicrophone.SelectedItem?.ToString() : null;
+                var enumerator = new MMDeviceEnumerator();
+                MMDevice? device = null;
+
+                if (!string.IsNullOrEmpty(selectedMic))
+                {
+                    var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                    device = devices.FirstOrDefault(d => d.FriendlyName == selectedMic);
+                }
+                device ??= enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+
+                int vol = (int)Math.Round(device.AudioEndpointVolume.MasterVolumeLevelScalar * 100);
+                trackMicVolume.Value = Math.Clamp(vol, 0, 100);
+                lblMicVolumeValue.Text = vol + "%";
+            }
+            catch { }
+        }
+
+        private void SetMicVolume(int percent)
+        {
+            try
+            {
+                string? selectedMic = cmbMicrophone.SelectedIndex > 0 ? cmbMicrophone.SelectedItem?.ToString() : null;
+                var enumerator = new MMDeviceEnumerator();
+                MMDevice? device = null;
+
+                if (!string.IsNullOrEmpty(selectedMic))
+                {
+                    var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                    device = devices.FirstOrDefault(d => d.FriendlyName == selectedMic);
+                }
+                device ??= enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+
+                device.AudioEndpointVolume.MasterVolumeLevelScalar = percent / 100f;
+            }
+            catch { }
+        }
+
         // ─── Завантаження ─────────────────────────────────────────
 
         private void LoadConfig()
@@ -160,6 +209,14 @@ namespace AlexaSettings
                 if (idx >= 0) cmbMicrophone.SelectedIndex = idx;
             }
 
+            // Гучність мікрофону — спочатку беремо з системи, потім з config (якщо задано)
+            LoadMicVolume();
+            if (_config.MicrophoneVolume >= 0)
+            {
+                trackMicVolume.Value = Math.Clamp(_config.MicrophoneVolume, 0, 100);
+                lblMicVolumeValue.Text = _config.MicrophoneVolume + "%";
+            }
+
             UpdateWakeWordMode();
         }
 
@@ -203,6 +260,9 @@ namespace AlexaSettings
             _config.MicrophoneDevice = cmbMicrophone.SelectedIndex <= 0
                 ? ""
                 : cmbMicrophone.SelectedItem!.ToString()!;
+
+            _config.MicrophoneVolume = trackMicVolume.Value;
+            SetMicVolume(trackMicVolume.Value);
 
             try
             {
@@ -353,6 +413,129 @@ namespace AlexaSettings
             LoadConfig();
             MessageBox.Show("Налаштування перезавантажено.", "Оновлено",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void trackMicVolume_Scroll(object sender, EventArgs e)
+        {
+            lblMicVolumeValue.Text = trackMicVolume.Value + "%";
+            SetMicVolume(trackMicVolume.Value);
+        }
+
+        private void btnMicTest_Click(object sender, EventArgs e)
+        {
+            if (_micTestRunning)
+            {
+                StopMicTest();
+                btnMicTest.Text = "▶ Почати тест";
+            }
+            else
+            {
+                StartMicTest();
+                btnMicTest.Text = "⏹ Зупинити";
+            }
+        }
+
+        private void StartMicTest()
+        {
+            try
+            {
+                // Знаходимо індекс пристрою для WaveIn
+                int deviceIndex = 0;
+                string? selectedMic = cmbMicrophone.SelectedIndex > 0 ? cmbMicrophone.SelectedItem?.ToString() : null;
+                if (!string.IsNullOrEmpty(selectedMic))
+                {
+                    for (int i = 0; i < WaveIn.DeviceCount; i++)
+                    {
+                        var caps = WaveIn.GetCapabilities(i);
+                        if (caps.ProductName.Contains(selectedMic[..Math.Min(31, selectedMic.Length)], StringComparison.OrdinalIgnoreCase))
+                        {
+                            deviceIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                _micTestCapture = new WaveInEvent
+                {
+                    DeviceNumber = deviceIndex,
+                    WaveFormat = new WaveFormat(16000, 16, 1),
+                    BufferMilliseconds = 50
+                };
+
+                _micTestCapture.DataAvailable += (s, args) =>
+                {
+                    // Обчислюємо RMS рівень
+                    float sum = 0;
+                    int count = args.BytesRecorded / 2;
+                    for (int i = 0; i < args.BytesRecorded - 1; i += 2)
+                    {
+                        short sample = BitConverter.ToInt16(args.Buffer, i);
+                        float normalized = sample / 32768f;
+                        sum += normalized * normalized;
+                    }
+                    float rms = count > 0 ? (float)Math.Sqrt(sum / count) : 0f;
+                    _currentMicLevel = Math.Min(rms * 5f, 1f); // посилення x5 для видимості
+                };
+
+                _micTestCapture.StartRecording();
+
+                // Таймер для оновлення ProgressBar
+                _micTestTimer = new System.Windows.Forms.Timer { Interval = 50 };
+                _micTestTimer.Tick += (s, e) =>
+                {
+                    int level = (int)(_currentMicLevel * 100);
+                    pbMicLevel.Value = Math.Clamp(level, 0, 100);
+
+                    // Змінюємо колір залежно від рівня
+                    if (level > 80) pbMicLevel.ForeColor = Color.FromArgb(200, 50, 50);
+                    else if (level > 50) pbMicLevel.ForeColor = Color.FromArgb(220, 160, 0);
+                    else pbMicLevel.ForeColor = Color.FromArgb(37, 150, 90);
+                };
+                _micTestTimer.Start();
+                _micTestRunning = true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Помилка запуску тесту мікрофону:\n{ex.Message}", "Помилка",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void StopMicTest()
+        {
+            _micTestRunning = false;
+            _micTestTimer?.Stop();
+            _micTestTimer?.Dispose();
+            _micTestTimer = null;
+            _micTestCapture?.StopRecording();
+            _micTestCapture?.Dispose();
+            _micTestCapture = null;
+            pbMicLevel.Value = 0;
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            StopMicTest();
+            base.OnFormClosing(e);
+        }
+
+        private void btnEye_Click(object sender, EventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is TextBox txt)
+                txt.UseSystemPasswordChar = !txt.UseSystemPasswordChar;
+        }
+
+        private void btnCopy_Click(object sender, EventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is TextBox txt && !string.IsNullOrEmpty(txt.Text))
+            {
+                Clipboard.SetText(txt.Text);
+                var originalText = btn.Text;
+                btn.Text = "✓";
+                var t = new System.Windows.Forms.Timer { Interval = 1200 };
+                t.Tick += (_, __) => { btn.Text = originalText; t.Stop(); t.Dispose(); };
+                t.Start();
+            }
         }
     }
 

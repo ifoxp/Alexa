@@ -1,5 +1,6 @@
 import json
 import asyncio
+import time
 from datetime import datetime
 from openai import AsyncOpenAI
 from logger_config import get_logger
@@ -9,11 +10,11 @@ from command_logger import command_logger
 logger = get_logger('smart_ai')
 
 class SmartAssistant:
-    def __init__(self, api_key, model="gemini-3.1-flash-lite-preview"): 
+    def __init__(self, api_key, model="gemini-2.5-flash-lite"): 
         self.client = AsyncOpenAI(
             api_key=api_key,
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/", # Перенаправлення на Gemini
-            timeout=15.0,
+            timeout=8.0,
             max_retries=2
         )
         self.model = model
@@ -106,15 +107,13 @@ class SmartAssistant:
 КРОК 3. ЧИСТА РОЗМОВА: Якщо в тексті немає жодної вказівки до дії (просто "привіт", "як справи") — встанови `isCommand: false` і порожній `execution_plan`.
 
 ПРАВИЛА ДЛЯ ВІДПОВІДІ (jarvis_response):
-- Звертайся "сер".
-- Стиль: британський дворецький.
-- Ніколи не повторюй попередні відповіді.
-- Довжина: 4-10 слів.
+- Відповідь має бути УЛЬТРАКОРОТКОЮ. Максимум 1-3 слова.
+- Дозволені варіанти: "Так, сер", "Виконую", "Вже роблю", "Секунду", "Запскаю Steam", "Запускаю програми", "Вмикаю Neffex".
+- НІКОЛИ не перераховуй програми чи дії, які ти збираєшся виконати. Економ час.
 
 ФОРМАТ ВІДПОВІДІ (строго JSON):
 {{
   "isCommand": true або false,
-  "thought_process": "Коротко: чому обрано цей плагін і команду",
   "execution_plan": [
     {{
       "plugin": "точна_назва_плагіна",
@@ -126,7 +125,7 @@ class SmartAssistant:
       ]
     }}
   ],
-  "jarvis_response": "Твоя жива відповідь."
+  "jarvis_response": "Твоя ультракоротка відповідь."
 }}"""
 
             user_prompt = f"""Користувач каже: "{user_text}"\n{context_hint}"""
@@ -200,35 +199,35 @@ def initialize_smart_assistant(api_key):
 
 
 
+import time # Переконайся, що цей імпорт є на початку файлу smart_ai.py
+
 async def process_smart_command(user_text):
     """Основна функція для обробки команд через ШІ (Однопрохідна система)"""
+    global_start_time = time.time() # ⏱ СТАРТ ЗАГАЛЬНОГО ЧАСУ
+
     if not smart_assistant:
         logger.error("AI assistant not configured")
-        try:
-            await command_logger.log_command(user_text, "ШІ асистент не налаштовано", "Не виконано")
-        except: pass
         return {"success": False, "message": "ШІ асистент не налаштовано."}
 
     try:
         from smart_plugin_manager import SmartPluginManager
 
-        # Ініціалізуємо менеджер плагінів
         if not hasattr(smart_assistant, 'plugin_manager') or smart_assistant.plugin_manager is None:
                 smart_assistant.plugin_manager = SmartPluginManager()
 
-        # ЄДИНИЙ ЕТАП: Отримуємо план і відповідь за один запит
+        # ⏱ ЗАМІР ЧАСУ ШІ
+        ai_start_time = time.time()
         ai_result = await smart_assistant.process_single_pass(user_text)
+        ai_duration = time.time() - ai_start_time
+        print(f"\n[⏱ ТАЙМЕР] Запит до ШІ зайняв: {ai_duration:.2f} сек")
 
-        # Логуємо результат
         await command_logger.log_command(user_text, "Single-pass execution", str(ai_result))
 
         if not ai_result.get("success"):
             if ai_result.get("casual_talk"):
                 return {
-                    "success": False,
-                    "message": "Розмова розпізнана",
-                    "casual_talk": True,
-                    "quick_response": ai_result.get("jarvis_response") # Можна озвучити, якщо хочеш щоб він відповідав на розмови
+                    "success": False, "message": "Розмова", "casual_talk": True,
+                    "quick_response": ai_result.get("jarvis_response")
                 }
             return {"success": False, "message": ai_result.get("error", "Невідома помилка")}
 
@@ -236,92 +235,75 @@ async def process_smart_command(user_text):
         quick_response = ai_result.get("jarvis_response", "Виконую, сер")
         selected_plugins = ai_result.get("selected_plugins", [])
 
-        print(f"Quick Jarvis response prepared: {quick_response}")
-
-        # Завантажуємо конфігурацію для TTS
         try:
             import config_manager as cfg
             config = cfg.load_config()
-        except Exception as config_error:
+        except Exception:
             config = {}
 
         if not execution_plan:
             return {"success": False, "message": "Пустий план виконання"}
 
-        # ВИКОНАННЯ КОМАНД
+        # 🔥 МАГІЯ ТУТ: Запускаємо озвучку ОДРАЗУ, не чекаючи плагінів
+        print(f"[🔊 Jarvis каже]: {quick_response}")
+        tts_task = None
+        try:
+            tts_task = asyncio.create_task(asyncio.to_thread(speak_text, quick_response, config))
+        except Exception as e:
+            print(f"Помилка запуску TTS: {e}")
+
+        # ⏱ ЗАМІР ЧАСУ ВИКОНАННЯ ПЛАГІНІВ
+        # ⏱ ЗАМІР ЧАСУ ВИКОНАННЯ ПЛАГІНІВ
+        plugin_start_time = time.time()
         execution_results = []
+        
         for plugin_info in execution_plan:
             plugin_name = plugin_info.get("plugin")
-            command_sequence = plugin_info.get("commands", [])
-
-            for command_info in command_sequence:
+            for command_info in plugin_info.get("commands", []):
                 command_name = command_info.get("command")
                 params = command_info.get("params", {})
 
-                # Видаляємо можливі цифри з кінця команди (наприклад open_program1 -> open_program)
                 import re
                 clean_command_name = re.sub(r'_?\d+$', '', command_name)
 
                 result = await smart_assistant.plugin_manager.execute_plugin_command(
                     plugin_name, clean_command_name, **params
                 )
+                execution_results.append({"plugin": plugin_name, "command": clean_command_name, "result": result})
 
-                execution_results.append({
-                    "plugin": plugin_name,
-                    "command": clean_command_name,
-                    "result": result
-                })
+                # 🔥 ДОДАЙ ЦЕ: Секундна пауза між командами, щоб Windows встиг опрацювати запуск
+                await asyncio.sleep(1.0)
 
-                if not result.get("success"):
-                    logger.warning(f"Command failed: {plugin_name}.{clean_command_name} — {result.get('message', '')}")
+        plugin_duration = time.time() - plugin_start_time
+        print(f"[⏱ ТАЙМЕР] Виконання плагінів зайняло: {plugin_duration:.2f} сек")
 
         successful_commands = [r for r in execution_results if r["result"].get("success")]
 
         if successful_commands:
-            # Оновлюємо контекст розмови
             smart_assistant.update_conversation_context(user_text, quick_response, selected_plugins)
-
-            plugin_speak_text = None
+            
             for result in successful_commands:
-                plugin_result = result.get("result", {})
-                if "speak_text" in plugin_result:
-                    plugin_speak_text = plugin_result["speak_text"]
+                if "speak_text" in result.get("result", {}):
+                    if tts_task: await tts_task 
+                    speak_text(result["result"]["speak_text"], config)
                     break
-
-            text_to_speak = plugin_speak_text if plugin_speak_text else quick_response
-
-            print(f"Command successful - playing response: {text_to_speak}")
-            tts_task = None
-            try:
-                tts_task = asyncio.create_task(asyncio.to_thread(speak_text, text_to_speak, config))
-            except Exception as tts_error:
-                print(f"Success TTS error: {tts_error}")
-
-            if tts_task and not tts_task.done():
-                try:
-                    await tts_task
-                    await asyncio.sleep(0.5)
-                except Exception: pass
-
-            return {
-                "success": True,
-                "action": {
-                    "type": "plugin_execution",
-                    "results": execution_results,
-                    "successful_count": len(successful_commands),
-                    "total_count": len(execution_results)
-                },
-                "message": "Команда виконана",
-                "quick_response": quick_response
-            }
         else:
-            print(f"Command failed - playing error message")
-            try:
-                speak_text("Вибачте, команду не вдалося виконати, сер", config)
-            except Exception: pass
+            if tts_task: await tts_task
+            speak_text("Вибачте, команду не вдалося виконати, сер", config)
 
-            return {"success": False, "message": "Жодна команда не виконалася успішно"}
+        # 🔥 ДОДАЙ ЦЕ: Обов'язково чекаємо завершення базової фрази перед тим, як увімкнути мікрофон
+        if tts_task and not tts_task.done():
+            await tts_task
 
+        total_duration = time.time() - global_start_time
+        print(f"[⏱ ТАЙМЕР] Всього від отримання тексту до завершення: {total_duration:.2f} сек\n")
+
+        return {
+            "success": True,
+            "action": {"type": "plugin_execution", "successful_count": len(successful_commands)},
+            "message": "Команда виконана", "quick_response": quick_response
+        }
+    
     except Exception as e:
         import traceback
         logger.error("Smart command processing failed", extra={'error': str(e), 'traceback': traceback.format_exc()})

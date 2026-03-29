@@ -87,17 +87,34 @@ def build_python() -> bool:
         '--hidden-import=pvporcupine',
         '--hidden-import=pystray',
         '--hidden-import=PIL',
-        # Залежності плагінів (вшиваємо щоб не довантажувати при кожному запуску)
-        '--collect-all=spotipy',
-        '--collect-all=pycaw',
-        '--collect-all=pywin32',
+        # spotipy — використовується в music_control.py
+        '--hidden-import=spotipy',
+        '--hidden-import=spotipy.oauth2',
+        '--hidden-import=spotipy.cache_handler',
+        # pycaw — використовується в main.py та sound_control.py
+        '--hidden-import=pycaw',
+        '--hidden-import=pycaw.pycaw',
+        '--hidden-import=pycaw.constants',
+        '--hidden-import=pycaw.utils',
+        # pywin32 — тільки ті модулі що реально імпортуються в коді:
+        # win32gui, win32process (sound_control.py), comtypes (main.py, sound_control.py)
         '--hidden-import=win32gui',
-        '--hidden-import=win32api',
-        '--hidden-import=win32con',
         '--hidden-import=win32process',
+        '--hidden-import=comtypes',
+        '--hidden-import=comtypes.client',
         '--hidden-import=pywintypes',
+        # winsdk — media_controller.py
+        '--hidden-import=winsdk',
+        '--hidden-import=winsdk.windows.media.control',
+        # інші плагіни
         '--hidden-import=keyboard',
         '--hidden-import=screen_brightness_control',
+        # Виключаємо наукові бібліотеки — в проекті не використовуються
+        '--exclude-module=numpy',
+        '--exclude-module=scipy',
+        '--exclude-module=matplotlib',
+        '--exclude-module=pandas',
+        '--exclude-module=tkinter',
         '--noconsole',
     ]
 

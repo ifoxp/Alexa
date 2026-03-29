@@ -166,3 +166,99 @@ GPT Етап 1 (вибір плагінів): Single-pass execution
 GPT Етап 2 (команди + відповідь): {'success': False, 'casual_talk': True, 'jarvis_response': 'Радий, що вам до вподоби, сер.'}
 ========================================
 
+
+========================================
+Час: 2026-03-27 14:41:09
+Команда користувача: discord і Steam тоже
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Discord'}}, {'command': 'open_program', 'params': {'value': 'Steam'}}]}], 'jarvis_response': 'Виконую, сер. Відкриваю Discord та Steam для вас.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:41:20
+Команда користувача: відкриваю Дискорд та стиль для вас
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Discord'}}]}], 'jarvis_response': 'Виконую, сер. Відкриваю Discord для вас.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:41:44
+Команда користувача: виконую все відкриваю Дискорд для вас
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Discord'}}]}], 'jarvis_response': 'Виконую, сер. Відкриваю Discord для вас.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:44:53
+Команда користувача: Відкрий Steam та discord
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Steam'}}, {'command': 'open_program', 'params': {'value': 'Discord'}}]}], 'jarvis_response': 'Виконую, сер. Відкриваю Steam та Discord для вас.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:45:05
+Команда користувача: discord для вас
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Discord'}}]}], 'jarvis_response': 'Звісно, сер. Відкриваю Discord для вас.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:45:14
+Команда користувача: звісно все відкриваю Дискорд для вас
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Discord'}}]}], 'jarvis_response': 'Слухаюся, сер. Запускаю Discord негайно.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:48:10
+Команда користувача: Відкрий discord Steam
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Discord'}}, {'command': 'open_program', 'params': {'value': 'Steam'}}]}], 'jarvis_response': 'Виконую, сер. Відкриваю Discord та Steam для вас.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:51:52
+Команда користувача: discord
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Discord'}}]}], 'jarvis_response': 'Виконую, сер. Відкриваю Discord для вас.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:52:33
+Команда користувача: Відкрий Steam і discord
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Steam'}}, {'command': 'open_program', 'params': {'value': 'Discord'}}]}], 'jarvis_response': 'Виконую, сер. Відкриваю Steam та Discord для вас.', 'selected_plugins': ['windows_programs']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:54:13
+Команда користувача: Відкрий stimma discord також Запусти Spotify і включи там Imagine Dragons пожалуйста
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'windows_programs', 'commands': [{'command': 'open_program', 'params': {'value': 'Steam'}}, {'command': 'open_program', 'params': {'value': 'Discord'}}, {'command': 'open_program', 'params': {'value': 'Spotify'}}]}, {'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'Imagine Dragons'}}]}], 'jarvis_response': 'Виконую, сер. Усі програми запущено, музику ввімкнено.', 'selected_plugins': ['windows_programs', 'music_control']}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:57:34
+Команда користувача: включи DZIDZIO пожалуйста
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': False, 'error': 'Помилка ШІ: Connection error.'}
+========================================
+
+
+========================================
+Час: 2026-03-27 14:59:07
+Команда користувача: хочу послухати DZIDZIO включи
+GPT Етап 1 (вибір плагінів): Single-pass execution
+GPT Етап 2 (команди + відповідь): {'success': True, 'execution_plan': [{'plugin': 'music_control', 'commands': [{'command': 'search_artist', 'params': {'value': 'DZIDZIO'}}]}], 'jarvis_response': 'Звісно, сер. Вмикаю композиції гурту DZIDZIO для вас.', 'selected_plugins': ['music_control']}
+========================================
+

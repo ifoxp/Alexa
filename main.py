@@ -41,6 +41,57 @@ def create_porcupine_model(access_key, model_path, sensitivity, is_custom):
             sensitivities=[sensitivity]
         )
 
+def set_microphone_volume(device_name: str, volume_percent: int):
+    """
+    Встановлює гучність мікрофону через Windows Core Audio API.
+    device_name — назва пристрою з config (або порожньо для системного).
+    volume_percent — 0..100.
+    """
+    try:
+        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+        from pycaw.constants import CLSCTX_ALL
+        import comtypes
+
+        devices = AudioUtilities.GetMicrophone()
+        # Якщо задано конкретний пристрій — шукаємо його
+        if device_name:
+            from ctypes import cast, POINTER
+            from pycaw.pycaw import IMMDeviceEnumerator
+            try:
+                import comtypes.client
+                enumerator = comtypes.client.CreateObject(
+                    "{BCDE0395-E52F-467C-8E3D-C4579291692E}",
+                    interface=IMMDeviceEnumerator
+                )
+                collection = enumerator.EnumAudioEndpoints(1, 1)  # eCapture, DEVICE_STATE_ACTIVE
+                count = collection.GetCount()
+                for i in range(count):
+                    dev = collection.Item(i)
+                    props = dev.OpenPropertyStore(0)
+                    try:
+                        friendly_name = props.GetValue(
+                            comtypes.GUID("{a45c254e-df1c-4efd-8020-67d146a850e0}"), 14
+                        ).value
+                    except Exception:
+                        friendly_name = ""
+                    if device_name.lower() in str(friendly_name).lower():
+                        devices = dev
+                        break
+            except Exception:
+                pass
+
+        if devices is None:
+            return
+
+        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        volume = cast(interface, POINTER(IAudioEndpointVolume))
+        volume.SetMasterVolumeLevelScalar(volume_percent / 100.0, None)
+        logger.info(f"Гучність мікрофону встановлено: {volume_percent}%",
+                    extra={'device': device_name or '(системний)'})
+    except Exception as e:
+        logger.warning("Не вдалося встановити гучність мікрофону", extra={'error': str(e)})
+
+
 def get_microphone_index(audio_instance, device_name: str):
     """
     Повертає індекс мікрофону за його назвою.
@@ -120,7 +171,7 @@ def main():
 
         try:
             config = cfg.load_config()
-            tray = resource_mgr.add(TrayManager("Jarvis Assistant"))
+            tray = resource_mgr.add(TrayManager("Jarvis Assistant"), cleanup_func=lambda t: t.stop())
 
             # --- ІНІЦІАЛІЗАЦІЯ ШІ АСИСТЕНТА ---
             openai_key = config.get("openaiApiKey", "").strip()
@@ -192,11 +243,16 @@ def main():
         
             # Створюємо handler та аудіо ресурси
             handler = WakeWordHandler(tray)
-            audio = resource_mgr.add(pyaudio.PyAudio())
+            audio = resource_mgr.add(pyaudio.PyAudio(), cleanup_func=lambda a: a.terminate())
 
             # Визначаємо індекс мікрофону з конфігу
             mic_device_name = config.get("microphoneDevice", "")
             mic_index = get_microphone_index(audio, mic_device_name)
+
+            # Встановлюємо гучність мікрофону якщо задано в config
+            mic_volume = config.get("microphoneVolume", -1)
+            if isinstance(mic_volume, int) and 0 <= mic_volume <= 100:
+                set_microphone_volume(mic_device_name, mic_volume)
 
             logger.info("Аудіо пристрій", extra={
                 'microphoneDevice': mic_device_name or '(системний за замовчуванням)',
@@ -242,17 +298,17 @@ def main():
             logger.error("Critical startup error", extra={
                 'error': str(e),
                 'error_type': type(e).__name__
-            })
+            }, exc_info=True)
         finally:
             logger.info("Starting cleanup and resource shutdown")
-            if tray: tray.stop()
-            if porcupine: porcupine.delete()
-            if buffered_stream:
+            # tray, audio, buffered_stream зареєстровані в resource_mgr з cleanup_func —
+            # вони очищаються автоматично при виході з `with ResourceManager(...)`.
+            # Тут закриваємо тільки porcupine, який НЕ додано до resource_mgr.
+            if porcupine:
                 try:
-                    buffered_stream.close()
-                except Exception as cleanup_error:
-                    logger.debug("Stream cleanup error", extra={'error': str(cleanup_error)})
-            if audio: audio.terminate()
+                    porcupine.delete()
+                except Exception:
+                    pass
             logger.info("Program terminated successfully")
 
 if __name__ == "__main__":

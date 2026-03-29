@@ -49,6 +49,9 @@ namespace AlexaSettings
 
         [JsonProperty("microphoneDevice")]
         public string MicrophoneDevice { get; set; } = "";
+
+        [JsonProperty("microphoneVolume")]
+        public int MicrophoneVolume { get; set; } = -1; // -1 = не задано (зберігати системне)
     }
 
     // Допоміжна модель для відображення мов у UI

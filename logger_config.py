@@ -8,8 +8,12 @@ from pathlib import Path
 def setup_logger(name='alexa_assistant', level=logging.WARNING):
     """Налаштовує structured logging для асистента."""
 
-    # Створюємо папку для логів
-    logs_dir = Path("logs")
+    # Створюємо папку для логів поруч із виконуваним файлом (або скриптом)
+    if getattr(sys, 'frozen', False):
+        base_dir = Path(sys.executable).parent
+    else:
+        base_dir = Path(__file__).parent
+    logs_dir = base_dir / "logs"
     logs_dir.mkdir(exist_ok=True)
 
     # Формат для логів
