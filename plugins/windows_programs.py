@@ -64,7 +64,7 @@ class WindowsProgramsPlugin(SmartPlugin):
                 }
 
         except Exception as e:
-            self.log_error(f"Error executing {command_name}", error=str(e))
+            print(f"[ERROR] Error executing {command_name} | {e}")
             return {
                 "success": False,
                 "result": None,
@@ -195,25 +195,25 @@ class WindowsProgramsPlugin(SmartPlugin):
             if expanded_path.startswith("shell:AppsFolder"):
                 launch_cmd = f'explorer.exe {expanded_path}'
                 subprocess.Popen(launch_cmd, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                self.log_info(f"Launched MS Store App: {expanded_path}")
+                print(f"[INFO] Launched MS Store App: {expanded_path}")
                 return True
             # ============================================
 
             # Якщо це URL - відкриваємо в браузері
             if expanded_path.startswith(('http://', 'https://')):
                 webbrowser.open(expanded_path)
-                self.log_info(f"Opened website: {expanded_path}")
+                print(f"[INFO] Opened website: {expanded_path}")
                 return True
 
             # Якщо це .lnk файл, використовуємо os.startfile (без консолі)
             if expanded_path.endswith('.lnk') and os.path.exists(expanded_path):
                 os.startfile(expanded_path)
-                self.log_info(f"Launched .lnk file: {expanded_path}")
+                print(f"[INFO] Launched .lnk file: {expanded_path}")
                 return True
 
             # Спробуємо запустити через Windows start команду
             if self._try_start_app_via_windows(path):
-                self.log_info(f"Launched via Windows start: {path}")
+                print(f"[INFO] Launched via Windows start: {path}")
                 return True
 
             # Якщо це команда з параметрами
@@ -223,19 +223,19 @@ class WindowsProgramsPlugin(SmartPlugin):
                 args = parts[1]
                 if os.path.exists(exe_path) or exe_path in ['calc.exe', 'notepad.exe', 'mspaint.exe', 'explorer.exe']:
                     subprocess.Popen(f'"{exe_path}" {args}', shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                    self.log_info(f"Launched with args: {exe_path}")
+                    print(f"[INFO] Launched with args: {exe_path}")
                     return True
 
             # Звичайні exe файли та системні команди
             if os.path.exists(expanded_path) or expanded_path in ['calc.exe', 'notepad.exe', 'mspaint.exe', 'explorer.exe']:
                 subprocess.Popen([expanded_path], creationflags=subprocess.CREATE_NO_WINDOW)
-                self.log_info(f"Launched directly: {expanded_path}")
+                print(f"[INFO] Launched directly: {expanded_path}")
                 return True
 
             return False
 
         except Exception as e:
-            self.log_error(f"Failed to launch application {path}", error=str(e))
+            print(f"[ERROR] Failed to launch application {path} | {e}")
             return False
 
     def _try_start_app_via_windows(self, app_name: str) -> bool:
@@ -400,7 +400,7 @@ class WindowsProgramsPlugin(SmartPlugin):
                     print(f"[POWERSHELL_SEARCH] Found: {name} -> {app_id}")
                     
         except Exception as e:
-            self.log_error(f"PowerShell search failed for {query}", error=str(e))
+            print(f"[ERROR] PowerShell search failed for {query} | {e}")
             print(f"[POWERSHELL_SEARCH] Error: {e}")
 
         return matches

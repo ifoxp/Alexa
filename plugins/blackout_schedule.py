@@ -29,7 +29,7 @@ class BlackoutSchedulePlugin(SmartPlugin):
         file_path = r"E:\Programs\EcoFlowStats\schedule.json"
         
         if not os.path.exists(file_path):
-            self.log_error(f"Файл не знайдено: {file_path}")
+            print(f"[ERROR] Файл не знайдено: {file_path}")
             return None
             
         try:
@@ -38,7 +38,7 @@ class BlackoutSchedulePlugin(SmartPlugin):
                 # Повертаємо список годин відключень, наприклад: [4, 5, 8, 9, 10, 11...]
                 return data.get("outages", [])
         except Exception as e:
-            self.log_error("Помилка читання JSON файлу графіка", error=str(e))
+            print(f"[ERROR] Помилка читання JSON файлу графіка | {e}")
             return None
 
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
@@ -73,7 +73,7 @@ class BlackoutSchedulePlugin(SmartPlugin):
                 return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
-            self.log_error(f"Помилка виконання {command_name}", error=str(e))
+            print(f"[ERROR] Помилка виконання {command_name} | {e}")
             return {"success": False, "result": None, "message": f"Сталася помилка: {str(e)}"}
 
     def _when_light_on(self, current_hour: int, outages: list) -> Dict[str, Any]:

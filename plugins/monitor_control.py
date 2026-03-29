@@ -1,4 +1,3 @@
-import os
 import subprocess
 import screen_brightness_control as sbc
 from typing import Dict, Any
@@ -16,7 +15,7 @@ class MonitorControlPlugin(SmartPlugin):
             for i, name in enumerate(self.monitors):
                 print(f"  -> Індекс [{i}]: {name}")
         except Exception as e:
-            self.log_error(f"Failed to list monitors on init: {e}")
+            print(f"[ERROR] Failed to list monitors on init: {e}")
             self.monitors = []
 
     @property
@@ -41,10 +40,26 @@ class MonitorControlPlugin(SmartPlugin):
             print(f"\n=== MONITOR API DEBUG ===")
             print(f"[1] Command: {command_name} | Args: {kwargs}")
 
-            # Отримуємо значення, яке згенерував ШІ (зазвичай лежить у ключі value)
-            command_value = kwargs.get("value")
-            if command_value is None and kwargs:
-                command_value = list(kwargs.values())[0]
+            # Якщо є окреме поле level (формат "1,25" або "all,50") — пріоритет йому
+            level_field = kwargs.get("level", "")
+            if level_field:
+                parts = str(level_field).split(",")
+                if len(parts) == 2:
+                    command_value = [parts[0].strip(), parts[1].strip()]
+                else:
+                    command_value = ["all", parts[0].strip()]
+            else:
+                command_value = kwargs.get("value")
+                if command_value is None and kwargs:
+                    command_value = list(kwargs.values())[0]
+
+            # Якщо value прийшло як рядок — намагаємося розпарсити як JSON/список
+            if isinstance(command_value, str):
+                import json
+                try:
+                    command_value = json.loads(command_value)
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
             available_monitors = sbc.list_monitors()
             if not available_monitors:
@@ -142,5 +157,5 @@ class MonitorControlPlugin(SmartPlugin):
             return {"success": False, "result": None, "message": f"Невідома команда плагіна: {command_name}"}
 
         except Exception as e:
-            self.log_error(f"Monitor Control Error: {e}")
+            print(f"[ERROR] Monitor Control Error: {e}")
             return {"success": False, "result": None, "message": f"Внутрішня помилка керування дисплеєм: {str(e)}"}

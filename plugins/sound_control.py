@@ -60,12 +60,17 @@ class SystemControlPlugin(SmartPlugin):
                 return await self._set_active_app_volume(value_int)
 
             elif command_name == "set_specific_app_volume":
-                # Тут raw_value може бути "Steam 24" або "Spotify 100"
-                # Нам треба розпарсити це
-                if isinstance(raw_value, str):
+                app_name = kwargs.get("value", "")
+                level_str = kwargs.get("level", "")
+                # Якщо є окремі поля — збираємо в один рядок для парсера
+                if app_name and level_str:
+                    return await self._set_specific_app_volume_by_text(f"{app_name} {level_str}")
+                elif app_name:
+                    return await self._set_specific_app_volume_by_text(app_name)
+                elif isinstance(raw_value, str):
                     return await self._set_specific_app_volume_by_text(raw_value)
                 else:
-                     return {"success": False, "message": "Для цієї команди потрібна назва програми"}
+                    return {"success": False, "message": "Для цієї команди потрібна назва програми"}
 
             else:
                 return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}

@@ -59,7 +59,7 @@ class EntertainmentPlugin(SmartPlugin):
                 return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
-            self.log_error(f"Error executing {command_name}", error=str(e))
+            print(f"[ERROR] Error executing {command_name} | {e}")
             return {"success": False, "result": None, "message": f"Помилка виконання команди: {str(e)}"}
 
     def _get_random_topic(self, is_joke: bool) -> str:
@@ -89,17 +89,7 @@ class EntertainmentPlugin(SmartPlugin):
 
 ФОРМАТ: Тільки текст жарту з паузами (...)."""
 
-            response = await smart_ai.smart_assistant.client.chat.completions.create(
-                model=smart_ai.smart_assistant.model,
-                messages=[
-                    {"role": "system", "content": "Ти комік з чудовим почуттям гумору та таймінгом."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=150,
-                temperature=0.9 # Висока температура для креативності
-            )
-
-            generated_joke = response.choices[0].message.content.strip()
+            generated_joke = await self.ask_gpt(prompt, max_tokens=150, temperature=0.9)
 
             return {
                 "success": True,
@@ -109,7 +99,7 @@ class EntertainmentPlugin(SmartPlugin):
             }
 
         except Exception as e:
-            self.log_error(f"Failed to generate joke: {e}")
+            print(f"[ERROR] Failed to generate joke: {e}")
             joke = random.choice(self.fallback_jokes)
             return {"success": True, "result": {"joke": joke}, "message": "Розказую жарт", "speak_text": joke}
 
@@ -132,17 +122,7 @@ class EntertainmentPlugin(SmartPlugin):
 
 ФОРМАТ: Тільки текст факту з паузами."""
 
-            response = await smart_ai.smart_assistant.client.chat.completions.create(
-                model=smart_ai.smart_assistant.model,
-                messages=[
-                    {"role": "system", "content": "Ти ерудит, який вміє зацікавити слухача з перших секунд."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=200,
-                temperature=0.8
-            )
-
-            generated_fact = response.choices[0].message.content.strip()
+            generated_fact = await self.ask_gpt(prompt, max_tokens=200, temperature=0.8)
 
             return {
                 "success": True,
@@ -152,6 +132,6 @@ class EntertainmentPlugin(SmartPlugin):
             }
 
         except Exception as e:
-            self.log_error(f"Failed to generate fact: {e}")
+            print(f"[ERROR] Failed to generate fact: {e}")
             fact = random.choice(self.fallback_facts)
             return {"success": True, "result": {"fact": fact}, "message": "Розказую факт", "speak_text": fact}

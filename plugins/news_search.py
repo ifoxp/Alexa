@@ -53,7 +53,7 @@ class NewsReaderPlugin(SmartPlugin):
                 return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
-            self.log_error(f"Error executing {command_name}", error=str(e))
+            print(f"[ERROR] Error executing {command_name} | {e}")
             return {"success": False, "result": None, "message": f"Помилка виконання: {str(e)}"}
 
     async def _fetch_real_headlines(self, topic: str, limit: int = 5) -> str:
@@ -83,7 +83,7 @@ class NewsReaderPlugin(SmartPlugin):
             
             return "\n".join(headlines)
         except Exception as e:
-            self.log_error("Failed to fetch RSS", error=str(e))
+            print(f"[ERROR] Failed to fetch RSS | {e}")
             return ""
 
     async def _read_news(self, search_query: str, topic_name: str) -> Dict[str, Any]:
@@ -116,20 +116,10 @@ class NewsReaderPlugin(SmartPlugin):
 
 Згенеруй текст для озвучення українською мовою."""
 
-                response = await smart_ai.smart_assistant.client.chat.completions.create(
-                    model=smart_ai.smart_assistant.model,
-                    messages=[
-                        {"role": "system", "content": "Ти професійний ШІ-диктор новин. Генеруєш текст суворо для озвучення."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=300,
-                    temperature=0.6 # Трохи креативності для гарних переплетень слів
-                )
-                
-                final_text = response.choices[0].message.content.strip()
+                final_text = await self.ask_gpt(prompt, max_tokens=300, temperature=0.6)
                 
             except Exception as e:
-                self.log_error("GPT formatting failed", error=str(e))
+                print(f"[ERROR] GPT formatting failed | {e}")
                 final_text = f"Ось останні новини, сер. {headlines.replace('- ', '')}"
         else:
             final_text = f"Ось останні новини, сер. {headlines.replace('- ', '')}"

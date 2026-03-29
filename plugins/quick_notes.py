@@ -37,7 +37,7 @@ class QuickNotesPlugin(SmartPlugin):
             # Створюємо папку
             if not os.path.exists(notes_dir):
                 os.makedirs(notes_dir)
-                self.log_info(f"Created notes directory at: {notes_dir}")
+                print(f"[INFO] Created notes directory at: {notes_dir}")
 
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
             file_path = os.path.join(notes_dir, f"{today_str}.md")
@@ -81,7 +81,7 @@ class QuickNotesPlugin(SmartPlugin):
                 return {"success": False, "message": "Невідома команда."}
 
         except Exception as e:
-            self.log_error(f"Notes error", error=str(e))
+            print(f"[ERROR] Notes error | {e}")
             return {"success": False, "message": f"Помилка: {str(e)}"}
 
     def _get_real_desktop_path(self) -> str:

@@ -1,35 +1,106 @@
-import json
 import asyncio
 import time
 from datetime import datetime
-from openai import AsyncOpenAI
+from google import genai
+from google.genai import types
 from logger_config import get_logger
 from audio_player import speak_text
 from command_logger import command_logger
 
 logger = get_logger('smart_ai')
 
+# Модель для основного роутингу команд
+ROUTING_MODEL = "gemini-2.5-flash-lite"
+# Модель для запитів з плагінів (ask_gpt)
+PLUGIN_MODEL = "gemini-3.1-flash-lite-preview"
+
+
 class SmartAssistant:
-    def __init__(self, api_key, model="gemini-2.5-flash-lite"): 
-        self.client = AsyncOpenAI(
-            api_key=api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/", # Перенаправлення на Gemini
-            timeout=8.0,
-            max_retries=2
-        )
+    def __init__(self, api_key: str, model: str = ROUTING_MODEL):
+        self.client = genai.Client(api_key=api_key)
         self.model = model
+        self.plugin_model = PLUGIN_MODEL
         self.plugin_manager = None
         self.conversation_history = []
         self.last_responses = []
-        self.last_active_plugins = [] # Пам'ять для контексту
-        self.used_greetings = set()
-        # Кеш для швидких відповідей (простий лру кеш)
-        self.response_cache = {}
-        self.max_cache_size = 20
+        self.last_active_plugins = []
+        # Gemini tools — будуються один раз після ініціалізації plugin_manager
+        self._gemini_tools: list[types.Tool] | None = None
+
+    def build_gemini_tools(self) -> list[types.Tool]:
+        """Конвертує плагіни в Gemini FunctionDeclaration. Викликається один раз при старті."""
+        if not self.plugin_manager:
+            return []
+
+        declarations = []
+
+        # speak_response — окремий tool для відповіді Jarvis
+        declarations.append(types.FunctionDeclaration(
+            name="speak_response",
+            description=(
+                "Визначає що саме скаже Jarvis у відповідь. "
+                "ЗАВЖДИ викликай цю функцію разом з іншими командами. "
+                "Відповідь має бути ультракороткою (1-5 слів). "
+                "Для команд: 'Так, сер', 'Виконую', 'Секунду'. "
+                "Для питань/рекомендацій: 'Зараз підберу', 'Обдумую варіанти'. "
+                "Для розмови: природна коротка відповідь."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "text": types.Schema(
+                        type=types.Type.STRING,
+                        description="Текст який скаже Jarvis"
+                    ),
+                    "is_command": types.Schema(
+                        type=types.Type.BOOLEAN,
+                        description="True якщо це виконання команди, False якщо розмова або питання"
+                    )
+                },
+                required=["text", "is_command"]
+            )
+        ))
+
+        # Плагіни — кожна команда стає окремою FunctionDeclaration
+        for plugin_name, plugin in self.plugin_manager.plugins.items():
+            try:
+                for cmd_name, cmd_desc in plugin.commands.items():
+                    declarations.append(types.FunctionDeclaration(
+                        name=f"{plugin_name}__{cmd_name}",
+                        description=f"[{plugin_name}] {plugin.description} — {cmd_desc}",
+                        parameters=types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "value": types.Schema(
+                                    type=types.Type.STRING,
+                                    description=(
+                                        "Головний параметр: назва (пісні, програми, виконавця, плейлиста тощо). "
+                                        "Приклади: 'Imagine Dragons', 'Steam', 'рок'. "
+                                        "НЕ пиши сюди числові рівні (гучність, яскравість) — для них є поле 'level'."
+                                    )
+                                ),
+                                "level": types.Schema(
+                                    type=types.Type.STRING,
+                                    description=(
+                                        "Числовий рівень у відсотках або одиницях. "
+                                        "Використовуй для гучності, яскравості тощо. "
+                                        "Приклади: '50', '75', '25'. "
+                                        "Для монітора формат: номер_монітора,відсоток — наприклад '1,25' або 'all,50'."
+                                    )
+                                )
+                            },
+                            required=[]
+                        )
+                    ))
+            except Exception as e:
+                logger.error(f"Failed to build tool for plugin {plugin_name}", extra={"error": str(e)})
+
+        self._gemini_tools = [types.Tool(function_declarations=declarations)]
+        logger.info(f"Built {len(declarations)} Gemini tools from {len(self.plugin_manager.plugins)} plugins")
+        return self._gemini_tools
 
     def update_conversation_context(self, user_text: str, jarvis_response: str, executed_plugins: list = None):
-        """Оновлює контекст розмови для Jarvis-стилю"""
-        # Зберігаємо історію фраз
+        """Оновлює контекст розмови."""
         self.conversation_history.append(user_text)
         if len(self.conversation_history) > 2:
             self.conversation_history.pop(0)
@@ -37,131 +108,105 @@ class SmartAssistant:
         self.last_responses.append(jarvis_response)
         if len(self.last_responses) > 2:
             self.last_responses.pop(0)
-            
-        # ОНОВЛЮЄМО ПАМ'ЯТЬ ПЛАГІНІВ (Важливо для 'зроби тихіше')
+
         if executed_plugins:
             self.last_active_plugins = executed_plugins
             logger.info(f"Context updated with plugins: {executed_plugins}")
-        
 
-    async def generate_jarvis_response_parallel(self, user_text: str, selected_plugins: list):
-        """ОНОВЛЕНИЙ МЕТОД: Генерує команди + Jarvis відповідь в одному запиті"""
-
-        # Тепер execute_plugin_commands повертає і команди, і jarvis відповідь
-        execution_plan, jarvis_response = await self.execute_plugin_commands(user_text, selected_plugins)
-
-        return jarvis_response, execution_plan
-
-    async def process_single_pass(self, user_text: str):
-        """ОДНОПРОХІДНИЙ АЛГОРИТМ: Одночасно визначає плагін, команди та генерує відповідь."""
+    async def process_single_pass(self, user_text: str) -> dict:
+        """Однопрохідний запит до Gemini з function calling."""
         try:
-            # 1. Збираємо абсолютно всі плагіни та їх команди в одне "меню"
-            plugins_summary = self.plugin_manager.get_plugins_summary()
-            all_capabilities = []
-            
-            for plugin in plugins_summary:
-                plugin_name = plugin['name']
-                plugin_desc = plugin.get('description', '')
-                
-                # Отримуємо команди для цього конкретного плагіна
-                plugin_info = self.plugin_manager.get_plugin_commands(plugin_name)
-                commands_str = ""
-                if plugin_info and 'commands' in plugin_info:
-                    cmds = [f"    - {c_name}: {c_desc}" for c_name, c_desc in plugin_info['commands'].items()]
-                    commands_str = "\n".join(cmds)
-                else:
-                    commands_str = "    (немає специфічних команд)"
-                    
-                all_capabilities.append(f"[{plugin_name}] - {plugin_desc}\n  Доступні команди:\n{commands_str}")
-                
-            capabilities_text = "\n\n".join(all_capabilities)
+            # Будуємо tools якщо ще не побудовані
+            if self._gemini_tools is None:
+                self.build_gemini_tools()
 
-            # 2. Формуємо контекст попередніх розмов
+            # Формуємо контекст попередніх розмов
             context_hint = ""
-            if len(self.conversation_history) >= 1 and len(self.last_responses) >= 1:
+            if self.conversation_history and self.last_responses:
                 conversations = []
                 for i in range(min(len(self.conversation_history), len(self.last_responses), 2)):
                     idx = -(i + 1)
-                    user_said = self.conversation_history[idx]
-                    jarvis_replied = self.last_responses[idx]
-                    conversations.insert(0, f"користувач сказав; {user_said}\nJarvis відповів: {jarvis_replied}")
+                    conversations.insert(0,
+                        f"Користувач: {self.conversation_history[idx]}\n"
+                        f"Jarvis: {self.last_responses[idx]}"
+                    )
+                if self.last_active_plugins:
+                    conversations[-1] += f"\nВикористані плагіни: {self.last_active_plugins}"
+                context_hint = "\nКОНТЕКСТ:\n" + "\n".join(conversations)
+                context_hint += "\nЯкщо репліка продовжує попередню дію — використовуй ті ж плагіни."
 
-                if getattr(self, 'last_active_plugins', None):
-                    last_conversation = conversations[-1]
-                    last_conversation += f"\nВикористані плагіни: {self.last_active_plugins}"
-                    conversations[-1] = last_conversation
-
-                context_hint = f"\nКОНТЕКСТ ПОПЕРЕДНЬОЇ ДІЇ:\n" + "\n".join(conversations)
-                context_hint += f"\n\nПРАВИЛО КОНТЕКСТУ: Якщо нова репліка продовжує дію (наприклад, 'тихіше', 'наступний') — використовуй ті ж плагіни. Якщо це нова дія — ігноруй контекст."
-
-            # 3. Єдиний системний промпт, який робить все одразу
-            system_prompt = f"""Ти — JARVIS, розумний маршрутизатор та голосовий асистент. 
-Твоя задача — за один крок проаналізувати репліку, обрати потрібний плагін, команду і згенерувати живу відповідь.
-
-МЕНЮ ДОСТУПНИХ ПЛАГІНІВ ТА КОМАНД:
-{capabilities_text}
-
-АЛГОРИТМ ПРИЙНЯТТЯ РІШЕННЯ:
-КРОК 1. АБСОЛЮТНИЙ ПРІОРИТЕТ (ДРУК): Якщо текст містить слова "напиши", "надрукуй", "введи", "набери" — це ЗАВЖДИ плагін `keyboard_typing`. Ігноруй весь подальший текст.
-КРОК 2. ПОШУК КОМАНДИ: Якщо це не друк, знайди плагін, опис якого відповідає запиту. Знайди точну назву команди з його списку.
-КРОК 3. ЧИСТА РОЗМОВА: Якщо в тексті немає жодної вказівки до дії (просто "привіт", "як справи") — встанови `isCommand: false` і порожній `execution_plan`.
-
-ПРАВИЛА ДЛЯ ВІДПОВІДІ (jarvis_response):
-- Відповідь має бути УЛЬТРАКОРОТКОЮ. Максимум 1-3 слова.
-- Дозволені варіанти: "Так, сер", "Виконую", "Вже роблю", "Секунду", "Запскаю Steam", "Запускаю програми", "Вмикаю Neffex".
-- НІКОЛИ не перераховуй програми чи дії, які ти збираєшся виконати. Економ час.
-
-ФОРМАТ ВІДПОВІДІ (строго JSON):
-{{
-  "isCommand": true або false,
-  "execution_plan": [
-    {{
-      "plugin": "точна_назва_плагіна",
-      "commands": [
-        {{
-          "command": "точна_назва_команди",
-          "params": {{"value": "значення_параметра (наприклад, назва пісні або програми)"}}
-        }}
-      ]
-    }}
-  ],
-  "jarvis_response": "Твоя ультракоротка відповідь."
-}}"""
-
-            user_prompt = f"""Користувач каже: "{user_text}"\n{context_hint}"""
-            
-            logger.info(f"GPT SINGLE-PASS СИСТЕМНИЙ ПРОМПТ:\n{system_prompt}")
-
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"},
-                max_completion_tokens=400,
-                temperature=0.4, # Баланс між точністю роутингу (0.1) та живою відповіддю (0.7)
-                timeout=12
+            system_instruction = (
+                "Ти — JARVIS, розумний голосовий асистент. "
+                "Аналізуй репліку та викликай потрібні функції.\n\n"
+                "ПРАВИЛА:\n"
+                "1. ЗАВЖДИ викликай speak_response — це голос Jarvis.\n"
+                "2. Якщо репліка містить 'напиши'/'надрукуй'/'введи' — це keyboard_typing.\n"
+                "3. Якщо це чиста розмова (привіт, як справи) — тільки speak_response з is_command=false.\n"
+                "4. Можна викликати кілька функцій одночасно.\n"
+                "5. Відповідь speak_response — ультракоротка, 1-5 слів."
             )
 
-            result_text = response.choices[0].message.content.strip()
-            logger.info(f"GPT SINGLE-PASS ВІДПОВІДЬ: {result_text}")
+            user_prompt = f'Користувач каже: "{user_text}"{context_hint}'
 
-            parsed_result = json.loads(result_text)
-            
-            # Якщо це просто розмова
-            if not parsed_result.get("isCommand", True):
+            logger.info(f"Sending to Gemini: {user_text}")
+
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model=self.model,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=self._gemini_tools,
+                    temperature=0.4,
+                    max_output_tokens=400,
+                )
+            )
+
+            # Логуємо AI обмін (зберігаємо 5 останніх)
+            command_logger.log_ai_exchange(system_instruction, user_prompt, response)
+
+            # Розбираємо function calls
+            jarvis_response = "Так, сер"
+            is_command = True
+            execution_plan = []
+
+            if not response.candidates:
+                return {"success": False, "error": "Gemini повернув порожню відповідь"}
+
+            for part in response.candidates[0].content.parts:
+                if part.function_call:
+                    fc = part.function_call
+                    logger.info(f"Function call: {fc.name} args={dict(fc.args)}")
+
+                    if fc.name == "speak_response":
+                        jarvis_response = fc.args.get("text", "Так, сер")
+                        is_command = fc.args.get("is_command", True)
+                    else:
+                        # Формат: plugin_name__command_name
+                        if "__" in fc.name:
+                            plugin_name, cmd_name = fc.name.split("__", 1)
+                            params = {}
+                            value = fc.args.get("value", "")
+                            level = fc.args.get("level", "")
+                            if value:
+                                params["value"] = value
+                            if level:
+                                params["level"] = level
+                            execution_plan.append({
+                                "plugin": plugin_name,
+                                "command": cmd_name,
+                                "params": params
+                            })
+
+            # Якщо тільки speak_response без команд — це розмова
+            if not is_command and not execution_plan:
                 return {
-                    "success": False, 
-                    "casual_talk": True, 
-                    "jarvis_response": parsed_result.get("jarvis_response", "Чим можу допомогти, сер?")
+                    "success": False,
+                    "casual_talk": True,
+                    "jarvis_response": jarvis_response
                 }
 
-            execution_plan = parsed_result.get("execution_plan", [])
-            jarvis_response = parsed_result.get("jarvis_response", "Так, сер")
-            
-            # Збираємо список плагінів для контексту
-            selected_plugins = [step.get("plugin") for step in execution_plan if step.get("plugin")]
+            selected_plugins = list({step["plugin"] for step in execution_plan})
 
             return {
                 "success": True,
@@ -172,15 +217,19 @@ class SmartAssistant:
 
         except Exception as e:
             import traceback
-            error_msg = str(e)
-            logger.error("Single-pass generation failed", extra={'error': error_msg, 'traceback': traceback.format_exc()})
-            return {"success": False, "error": f"Помилка ШІ: {error_msg}"}
-# Глобальний екземпляр (ініціалізується в main.py)
-smart_assistant = None
+            logger.error("Single-pass generation failed", extra={
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            })
+            return {"success": False, "error": f"Помилка ШІ: {str(e)}"}
 
 
-def initialize_smart_assistant(api_key):
-    """Ініціалізує ШІ асистента з API ключем"""
+# Глобальний екземпляр
+smart_assistant: SmartAssistant | None = None
+
+
+def initialize_smart_assistant(api_key: str) -> bool:
+    """Ініціалізує ШІ асистента з Gemini API ключем."""
     global smart_assistant
     if api_key and api_key != "YOUR_OPENAI_API_KEY_HERE":
         try:
@@ -188,22 +237,17 @@ def initialize_smart_assistant(api_key):
             logger.info("Smart AI assistant initialized successfully")
             return True
         except Exception as e:
-            logger.error("Failed to initialize Smart AI assistant", extra={
-                'error': str(e)
-            })
+            logger.error("Failed to initialize Smart AI assistant", extra={"error": str(e)})
             smart_assistant = None
             return False
     else:
-        logger.info("OpenAI API key not provided - AI assistant will not be available")
+        logger.info("Gemini API key not provided — AI assistant disabled")
         return False
 
 
-
-import time # Переконайся, що цей імпорт є на початку файлу smart_ai.py
-
-async def process_smart_command(user_text):
-    """Основна функція для обробки команд через ШІ (Однопрохідна система)"""
-    global_start_time = time.time() # ⏱ СТАРТ ЗАГАЛЬНОГО ЧАСУ
+async def process_smart_command(user_text: str) -> dict:
+    """Основна функція для обробки команд через ШІ."""
+    global_start_time = time.time()
 
     if not smart_assistant:
         logger.error("AI assistant not configured")
@@ -212,21 +256,24 @@ async def process_smart_command(user_text):
     try:
         from smart_plugin_manager import SmartPluginManager
 
-        if not hasattr(smart_assistant, 'plugin_manager') or smart_assistant.plugin_manager is None:
-                smart_assistant.plugin_manager = SmartPluginManager()
+        if smart_assistant.plugin_manager is None:
+            smart_assistant.plugin_manager = SmartPluginManager()
+            smart_assistant.build_gemini_tools()
 
-        # ⏱ ЗАМІР ЧАСУ ШІ
+        # Запит до Gemini
         ai_start_time = time.time()
         ai_result = await smart_assistant.process_single_pass(user_text)
         ai_duration = time.time() - ai_start_time
         print(f"\n[⏱ ТАЙМЕР] Запит до ШІ зайняв: {ai_duration:.2f} сек")
 
-        await command_logger.log_command(user_text, "Single-pass execution", str(ai_result))
+        await command_logger.log_command(user_text, ai_result)
 
         if not ai_result.get("success"):
             if ai_result.get("casual_talk"):
                 return {
-                    "success": False, "message": "Розмова", "casual_talk": True,
+                    "success": False,
+                    "message": "Розмова",
+                    "casual_talk": True,
                     "quick_response": ai_result.get("jarvis_response")
                 }
             return {"success": False, "message": ai_result.get("error", "Невідома помилка")}
@@ -244,7 +291,7 @@ async def process_smart_command(user_text):
         if not execution_plan:
             return {"success": False, "message": "Пустий план виконання"}
 
-        # 🔥 МАГІЯ ТУТ: Запускаємо озвучку ОДРАЗУ, не чекаючи плагінів
+        # Запускаємо озвучку одразу, не чекаючи плагінів
         print(f"[🔊 Jarvis каже]: {quick_response}")
         tts_task = None
         try:
@@ -252,27 +299,25 @@ async def process_smart_command(user_text):
         except Exception as e:
             print(f"Помилка запуску TTS: {e}")
 
-        # ⏱ ЗАМІР ЧАСУ ВИКОНАННЯ ПЛАГІНІВ
-        # ⏱ ЗАМІР ЧАСУ ВИКОНАННЯ ПЛАГІНІВ
+        # Виконуємо команди плагінів
         plugin_start_time = time.time()
         execution_results = []
-        
-        for plugin_info in execution_plan:
-            plugin_name = plugin_info.get("plugin")
-            for command_info in plugin_info.get("commands", []):
-                command_name = command_info.get("command")
-                params = command_info.get("params", {})
 
-                import re
-                clean_command_name = re.sub(r'_?\d+$', '', command_name)
+        for step in execution_plan:
+            plugin_name = step["plugin"]
+            command_name = step["command"]
+            params = step.get("params", {})
 
-                result = await smart_assistant.plugin_manager.execute_plugin_command(
-                    plugin_name, clean_command_name, **params
-                )
-                execution_results.append({"plugin": plugin_name, "command": clean_command_name, "result": result})
+            result = await smart_assistant.plugin_manager.execute_plugin_command(
+                plugin_name, command_name, **params
+            )
+            execution_results.append({
+                "plugin": plugin_name,
+                "command": command_name,
+                "result": result
+            })
 
-                # 🔥 ДОДАЙ ЦЕ: Секундна пауза між командами, щоб Windows встиг опрацювати запуск
-                await asyncio.sleep(1.0)
+            await asyncio.sleep(1.0)
 
         plugin_duration = time.time() - plugin_start_time
         print(f"[⏱ ТАЙМЕР] Виконання плагінів зайняло: {plugin_duration:.2f} сек")
@@ -281,30 +326,35 @@ async def process_smart_command(user_text):
 
         if successful_commands:
             smart_assistant.update_conversation_context(user_text, quick_response, selected_plugins)
-            
+
             for result in successful_commands:
                 if "speak_text" in result.get("result", {}):
-                    if tts_task: await tts_task 
+                    if tts_task:
+                        await tts_task
                     speak_text(result["result"]["speak_text"], config)
                     break
         else:
-            if tts_task: await tts_task
+            if tts_task:
+                await tts_task
             speak_text("Вибачте, команду не вдалося виконати, сер", config)
 
-        # 🔥 ДОДАЙ ЦЕ: Обов'язково чекаємо завершення базової фрази перед тим, як увімкнути мікрофон
         if tts_task and not tts_task.done():
             await tts_task
 
         total_duration = time.time() - global_start_time
-        print(f"[⏱ ТАЙМЕР] Всього від отримання тексту до завершення: {total_duration:.2f} сек\n")
+        print(f"[⏱ ТАЙМЕР] Всього: {total_duration:.2f} сек\n")
 
         return {
             "success": True,
             "action": {"type": "plugin_execution", "successful_count": len(successful_commands)},
-            "message": "Команда виконана", "quick_response": quick_response
+            "message": "Команда виконана",
+            "quick_response": quick_response
         }
-    
+
     except Exception as e:
         import traceback
-        logger.error("Smart command processing failed", extra={'error': str(e), 'traceback': traceback.format_exc()})
+        logger.error("Smart command processing failed", extra={
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
         return {"success": False, "message": f"Помилка: {str(e)}"}

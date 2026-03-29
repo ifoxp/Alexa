@@ -50,5 +50,5 @@ class KeyboardTypingPlugin(SmartPlugin):
             return {"success": False, "result": None, "message": f"Невідома команда плагіна: {command_name}"}
 
         except Exception as e:
-            self.log_error(f"Keyboard Typing Error: {e}")
+            print(f"[ERROR] Keyboard Typing Error: {e}")
             return {"success": False, "result": None, "message": f"Помилка клавіатури: {str(e)}"}

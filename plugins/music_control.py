@@ -41,7 +41,7 @@ class MusicControlPlugin(SmartPlugin):
             )
             self.sp = spotipy.Spotify(auth_manager=auth_manager)
         except Exception as e:
-            self.log_error(f"Failed to initialize Spotify API: {e}")
+            print(f"[ERROR] Failed to initialize Spotify API: {e}")
 
     @property
     def name(self) -> str:
@@ -54,9 +54,9 @@ class MusicControlPlugin(SmartPlugin):
     @property
     def commands(self) -> Dict[str, str]:
         return {
-            "play_music": "включити конкретний трек або пісню (коли відомий трек)",
-            "play_playlist": "включити плейлист за точною назвою плейлиста (НЕ назва виконавця)",
-            "search_artist": "включити всю музику виконавця або гурту (Imagine Dragons, Drake, тощо)",
+            "play_music": "включити конкретний трек або пісню. Використовуй ТІЛЬКИ якщо відома точна назва треку.",
+            "play_playlist": "включити плейлист за його точною назвою. Використовуй ТІЛЬКИ якщо користувач назвав конкретну назву плейлиста. НЕ використовуй для виконавців.",
+            "search_artist": "включити музику виконавця або гурту (Imagine Dragons, Drake тощо). Використовуй якщо названо виконавця, а не плейлист чи трек.",
             "play_genre": "включити музику певного жанру: поп, рок, хіп-хоп тощо",
             "pause_music": "поставити на паузу або відновити",
             "next_track": "увімкнути наступний трек",
@@ -70,14 +70,17 @@ class MusicControlPlugin(SmartPlugin):
             resp = self.sp.devices()
             devices = resp.get('devices', []) if resp else []
             
-            # Якщо список порожній, запускаємо додаток і чекаємо
+            # Якщо список порожній, запускаємо додаток і чекаємо поки з'явиться пристрій
             if not devices:
                 print("[SPOTIFY API] Немає пристроїв у мережі. Запускаю додаток Spotify...")
                 os.startfile("spotify:")
-                await asyncio.sleep(7.0)  # Даємо 7 секунд на повне завантаження і синхронізацію з API
-                
-                resp = self.sp.devices()
-                devices = resp.get('devices', []) if resp else []
+                for _ in range(15):  # Чекаємо до 15 сек (15 x 1 сек)
+                    await asyncio.sleep(1.0)
+                    resp = self.sp.devices()
+                    devices = resp.get('devices', []) if resp else []
+                    if devices:
+                        print(f"[SPOTIFY API] Пристрій з'явився через {_ + 1} сек")
+                        break
                 
             if not devices:
                 return None
@@ -192,13 +195,13 @@ class MusicControlPlugin(SmartPlugin):
         except spotipy.exceptions.SpotifyException as e:
             # ЦЕЙ PRINT ПОКАЖЕ ТОЧНУ ПРИЧИНУ
             print(f"\n[🔴 CRITICAL SPOTIFY ERROR] Код: {e.http_status}, Повідомлення: {e.msg}")
-            self.log_error(f"Spotify API Error: {e}")
+            print(f"[ERROR] Spotify API Error: {e}")
             if e.http_status == 403 or "PREMIUM_REQUIRED" in str(e):
                  return {"success": False, "result": None, "message": "Для керування відтворенням потрібен Spotify Premium"}
             return {"success": False, "result": None, "message": f"Помилка доступу до Spotify: {e.msg}"}
         except Exception as e:
             print(f"\n[🔴 UNEXPECTED ERROR] {str(e)}")
-            self.log_error(f"Unexpected Spotify API Error: {e}")
+            print(f"[ERROR] Unexpected Spotify API Error: {e}")
             return {"success": False, "result": None, "message": f"Внутрішня помилка: {str(e)}"}
 
         return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}

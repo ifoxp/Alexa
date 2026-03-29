@@ -51,7 +51,7 @@ class BrowserSearchPlugin(SmartPlugin):
                 return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
-            self.log_error(f"Error executing {command_name}", error=str(e))
+            print(f"[ERROR] Error executing {command_name} | {e}")
             return {"success": False, "result": None, "message": f"Помилка виконання: {str(e)}"}
 
     async def _search_google(self, query: str) -> Dict[str, Any]:
@@ -61,7 +61,7 @@ class BrowserSearchPlugin(SmartPlugin):
             google_url = f"https://www.google.com/search?q={search_query}"
             
             webbrowser.open(google_url)
-            self.log_info(f"Opened Google search: {query}")
+            print(f"[INFO] Opened Google search: {query}")
             
             return {
                 "success": True, 
@@ -78,7 +78,7 @@ class BrowserSearchPlugin(SmartPlugin):
             youtube_url = f"https://www.youtube.com/results?search_query={search_query}"
             
             webbrowser.open(youtube_url)
-            self.log_info(f"Opened YouTube search: {query}")
+            print(f"[INFO] Opened YouTube search: {query}")
             
             return {
                 "success": True, 
@@ -129,5 +129,5 @@ class BrowserSearchPlugin(SmartPlugin):
                 }
                 
         except Exception as e:
-            self.log_error(f"Failed to play YouTube video: {query}", error=str(e))
+            print(f"[ERROR] Failed to play YouTube video: {query} | {e}")
             return {"success": False, "result": None, "message": f"Помилка відтворення: {str(e)}"}

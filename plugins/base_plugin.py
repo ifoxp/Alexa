@@ -66,37 +66,42 @@ class SmartPlugin(ABC):
 
     async def ask_gpt(self, prompt: str, max_tokens: int = 150, temperature: float = 0.7) -> str:
         """
-        Викликає GPT з власним промптом плагіна.
+        Викликає Gemini з власним промптом плагіна.
 
         Args:
-            prompt: Промпт для GPT
+            prompt: Промпт для Gemini
             max_tokens: Максимум токенів
             temperature: Температура (креативність)
 
         Returns:
-            Відповідь GPT або помилкове повідомлення
+            Відповідь Gemini або помилкове повідомлення
         """
         try:
+            import asyncio
             import smart_ai
+            from google.genai import types
 
             if not smart_ai.smart_assistant:
-                return "GPT недоступний"
+                return "Gemini недоступний"
 
-            response = await smart_ai.smart_assistant.client.chat.completions.create(
-                model=smart_ai.smart_assistant.model,
-                messages=[
-                    {"role": "system", "content": f"Ти допомагаєш плагіну '{self.name}'. Відповідай українською мовою."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature
+            system_instruction = f"Ти допомагаєш плагіну '{self.name}'. Відповідай українською мовою."
+
+            response = await asyncio.to_thread(
+                smart_ai.smart_assistant.client.models.generate_content,
+                model=smart_ai.smart_assistant.plugin_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    max_output_tokens=max_tokens,
+                    temperature=temperature,
+                )
             )
 
-            return response.choices[0].message.content.strip()
+            return response.text.strip()
 
         except Exception as e:
-            self.log_error(f"GPT request failed", error=str(e))
-            return f"Помилка запиту до GPT: {str(e)}"
+            self.log_error(f"Gemini request failed", error=str(e))
+            return f"Помилка запиту до Gemini: {str(e)}"
 
     async def speak_text(self, text: str) -> bool:
         """

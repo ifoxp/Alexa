@@ -48,7 +48,7 @@ class MovieRecommendationsPlugin(SmartPlugin):
                 }
 
         except Exception as e:
-            self.log_error(f"Error executing {command_name}", error=str(e))
+            print(f"[ERROR] Error executing {command_name} | {e}")
             return {
                 "success": False,
                 "result": None,
@@ -71,17 +71,7 @@ class MovieRecommendationsPlugin(SmartPlugin):
 Назва: [Тільки точна назва фільму/серіалу/аніме українською або англійською]
 Опис: [2-3 речення про те, чому це круто і варто уваги. Без банальних фраз "Я рекомендую". Природна розповідь, що інтригує. В кінці додай "сер".]"""
 
-            response = await smart_ai.smart_assistant.client.chat.completions.create(
-                model=smart_ai.smart_assistant.model,
-                messages=[
-                    {"role": "system", "content": "Ти креативний асистент, який розуміється на кіно і дає круті поради."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=250,
-                temperature=0.8
-            )
-
-            gpt_reply = response.choices[0].message.content.strip()
+            gpt_reply = await self.ask_gpt(prompt, max_tokens=250, temperature=0.8)
             print(f"[MOVIE_REC] GPT Reply:\n{gpt_reply}")
 
             # Витягуємо назву та опис із відповіді GPT
@@ -102,7 +92,7 @@ class MovieRecommendationsPlugin(SmartPlugin):
             return await self._search_and_open_uakino(title, description)
 
         except Exception as e:
-            self.log_error("GPT recommendation failed", error=str(e))
+            print(f"[ERROR] GPT recommendation failed | {e}")
             return await self._search_and_open_uakino("Цікавий фільм", "Відкриваю сторінку з фільмами, сер.")
 
     async def _search_movie(self, movie_name: str) -> Dict[str, Any]:
@@ -124,7 +114,7 @@ class MovieRecommendationsPlugin(SmartPlugin):
             google_url = f"https://www.google.com/search?q={encoded_query}"
             
             webbrowser.open(google_url)
-            self.log_info(f"Opened uakino search for: {movie_name}")
+            print(f"[INFO] Opened uakino search for: {movie_name}")
             
             return {
                 "success": True,
@@ -136,7 +126,7 @@ class MovieRecommendationsPlugin(SmartPlugin):
                 "speak_text": speak_text # Тут буде красива розповідь від GPT!
             }
         except Exception as e:
-            self.log_error(f"Failed to search movie on uakino: {movie_name}", error=str(e))
+            print(f"[ERROR] Failed to search movie on uakino: {movie_name} | {e}")
             return {
                 "success": False,
                 "result": None,

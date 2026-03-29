@@ -1,6 +1,7 @@
 # smart_plugin_manager.py
 import os
 import sys
+import asyncio
 import importlib.util
 import inspect
 from typing import Dict, List, Any, Optional
@@ -317,8 +318,10 @@ class SmartPluginManager:
         plugin = self.plugins[plugin_name]
 
         try:
-            result = await plugin.execute_command(command_name, **kwargs)
-
+            from logger_config import capture_plugin_output
+            async with asyncio.timeout(30):
+                with capture_plugin_output(plugin_name):
+                    result = await plugin.execute_command(command_name, **kwargs)
             return result
 
         except Exception as e:

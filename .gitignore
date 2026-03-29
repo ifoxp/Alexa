@@ -222,3 +222,9 @@ AlexaSettings/obj/
 config.json
 /config.json
 .config.json
+
+commands_log.txt
+.commands_log.txt
+
+.logs/
+logs/

@@ -55,9 +55,10 @@ class OnlineTranscriber:
             self.recognizer.energy_threshold = 250 
             
             # Збільшуємо час паузи, щоб ти міг робити перерви між словами
-            self.recognizer.pause_threshold = 2.0  
-            self.recognizer.phrase_threshold = 0.1 
-            self.recognizer.non_speaking_duration = 0.5
+            self.recognizer.pause_threshold = 2.0
+            self.recognizer.phrase_threshold = 0.1
+            # Збільшено щоб захоплювався "хвіст" після останнього слова
+            self.recognizer.non_speaking_duration = 1.0
             logger.info("Microphone calibration completed with optimized settings")
 
     def set_language(self, lang_code):
@@ -128,7 +129,7 @@ class OnlineTranscriber:
                 audio = self.recognizer.listen(
                     source,
                     timeout=timeout,
-                    phrase_time_limit=10  # Максимум 10 секунд на фразу
+                    phrase_time_limit=20  # Максимум 20 секунд на фразу
                 )
             except sr.WaitTimeoutError:
                 return None

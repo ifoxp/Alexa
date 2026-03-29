@@ -109,6 +109,10 @@ def build_python() -> bool:
         # інші плагіни
         '--hidden-import=keyboard',
         '--hidden-import=screen_brightness_control',
+        # google-genai — Gemini SDK
+        '--hidden-import=google.genai',
+        '--hidden-import=google.genai.types',
+        '--hidden-import=google.auth',
         # Виключаємо наукові бібліотеки — в проекті не використовуються
         '--exclude-module=numpy',
         '--exclude-module=scipy',

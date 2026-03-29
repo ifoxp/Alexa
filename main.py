@@ -49,13 +49,13 @@ def set_microphone_volume(device_name: str, volume_percent: int):
     """
     try:
         from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-        from pycaw.constants import CLSCTX_ALL
+        from ctypes import cast, POINTER
+        from comtypes import CLSCTX_ALL
         import comtypes
 
         devices = AudioUtilities.GetMicrophone()
         # Якщо задано конкретний пристрій — шукаємо його
         if device_name:
-            from ctypes import cast, POINTER
             from pycaw.pycaw import IMMDeviceEnumerator
             try:
                 import comtypes.client
@@ -183,13 +183,14 @@ def main():
                     try:
                         from smart_plugin_manager import SmartPluginManager
                         smart_ai.smart_assistant.plugin_manager = SmartPluginManager()
+                        smart_ai.smart_assistant.build_gemini_tools()
                         logger.info("Plugin manager pre-initialized at startup")
                     except Exception as e:
                         logger.warning("Plugin manager pre-init failed", extra={'error': str(e)})
                 else:
                     logger.warning("Failed to initialize AI assistant")
             else:
-                logger.info("OpenAI API key not set — AI assistant disabled")
+                logger.info("Gemini API key not set — AI assistant disabled")
 
             # --- ОНОВЛЕНА ЛОГІКА ІНІЦІАЛІЗАЦІЇ PORCUPINE З КЕШЕМ ---
             access_key = config["picovoiceAccessKey"]
