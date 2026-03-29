@@ -10,7 +10,7 @@ from command_logger import command_logger
 logger = get_logger('smart_ai')
 
 # Модель для основного роутингу команд
-ROUTING_MODEL = "gemini-2.5-flash-lite"
+ROUTING_MODEL = "gemini-3.1-flash-lite-preview"
 # Модель для запитів з плагінів (ask_gpt)
 PLUGIN_MODEL = "gemini-3.1-flash-lite-preview"
 
@@ -150,8 +150,7 @@ class SmartAssistant:
 
             logger.info(f"Sending to Gemini: {user_text}")
 
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
+            response = await self.client.aio.models.generate_content(
                 model=self.model,
                 contents=user_prompt,
                 config=types.GenerateContentConfig(
@@ -167,7 +166,6 @@ class SmartAssistant:
 
             # Розбираємо function calls
             jarvis_response = "Так, сер"
-            is_command = True
             execution_plan = []
 
             if not response.candidates:
@@ -179,15 +177,15 @@ class SmartAssistant:
                     logger.info(f"Function call: {fc.name} args={dict(fc.args)}")
 
                     if fc.name == "speak_response":
-                        jarvis_response = fc.args.get("text", "Так, сер")
-                        is_command = fc.args.get("is_command", True)
+                        args_dict = dict(fc.args)
+                        jarvis_response = args_dict.get("text", "Так, сер")
                     else:
-                        # Формат: plugin_name__command_name
                         if "__" in fc.name:
                             plugin_name, cmd_name = fc.name.split("__", 1)
+                            args_dict = dict(fc.args)
                             params = {}
-                            value = fc.args.get("value", "")
-                            level = fc.args.get("level", "")
+                            value = args_dict.get("value", "")
+                            level = args_dict.get("level", "")
                             if value:
                                 params["value"] = value
                             if level:
@@ -198,8 +196,23 @@ class SmartAssistant:
                                 "params": params
                             })
 
-            # Якщо тільки speak_response без команд — це розмова
-            if not is_command and not execution_plan:
+                elif part.text:
+                    logger.info(f"Text response fallback: {part.text}")
+                    jarvis_response = part.text.strip()
+
+            # Фільтруємо вигадані команди — залишаємо тільки ті що реально існують
+            if execution_plan and self.plugin_manager:
+                valid_plan = []
+                for step in execution_plan:
+                    plugin = self.plugin_manager.plugins.get(step["plugin"])
+                    if plugin and step["command"] in plugin.commands:
+                        valid_plan.append(step)
+                    else:
+                        logger.warning(f"Gemini вигадав неіснуючу команду: {step['plugin']}.{step['command']} — ігнорую")
+                execution_plan = valid_plan
+
+            # Якщо немає валідних команд — це розмова
+            if not execution_plan:
                 return {
                     "success": False,
                     "casual_talk": True,

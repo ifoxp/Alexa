@@ -86,8 +86,7 @@ class SmartPlugin(ABC):
 
             system_instruction = f"Ти допомагаєш плагіну '{self.name}'. Відповідай українською мовою."
 
-            response = await asyncio.to_thread(
-                smart_ai.smart_assistant.client.models.generate_content,
+            response = await smart_ai.smart_assistant.client.aio.models.generate_content(
                 model=smart_ai.smart_assistant.plugin_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
