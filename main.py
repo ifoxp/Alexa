@@ -185,6 +185,25 @@ def main():
                         smart_ai.smart_assistant.plugin_manager = SmartPluginManager()
                         smart_ai.smart_assistant.build_gemini_tools()
                         logger.info("Plugin manager pre-initialized at startup")
+
+                        # --- ЗАПУСК КАЛЕНДАРЯ (БРИФІНГ ТА ФОНОВИЙ МОНІТОРИНГ) ---
+                        calendar_plugin = smart_ai.smart_assistant.plugin_manager.plugins.get("calendar_manager")
+                        if calendar_plugin:
+                            import threading
+                            import asyncio
+                            
+                            def start_calendar_loop():
+                                # Створюємо окремий Event Loop для фонових задач календаря
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                loop.create_task(calendar_plugin.startup_routine())
+                                loop.run_forever() # Залишаємо його працювати назавжди
+
+                            cal_thread = threading.Thread(target=start_calendar_loop, daemon=True)
+                            cal_thread.start()
+                            logger.info("Calendar background monitor started")
+                        # --------------------------------------------------------
+
                     except Exception as e:
                         logger.warning("Plugin manager pre-init failed", extra={'error': str(e)})
                 else:

@@ -230,3 +230,9 @@ commands_log.txt
 logs/
 
 .spotify_cache
+
+.calendar_tokens/
+calendar_tokens/
+
+.calendar_state.json
+credentials.json

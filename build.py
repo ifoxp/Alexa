@@ -59,6 +59,7 @@ def build_python() -> bool:
     pv_lib       = pvporcupine_path / "lib"
     pv_resources = pvporcupine_path / "resources"
 
+
     if not pv_lib.exists() or not pv_resources.exists():
         print("  [ПОМИЛКА] Папки lib/resources всередині pvporcupine не знайдено.")
         return False
@@ -94,8 +95,9 @@ def build_python() -> bool:
         # pycaw — використовується в main.py та sound_control.py
         '--hidden-import=pycaw',
         '--hidden-import=pycaw.pycaw',
-        '--hidden-import=pycaw.constants',
         '--hidden-import=pycaw.utils',
+        # psutil — використовується в media_controller.py та sound_control.py
+        '--hidden-import=psutil',
         # pywin32 — тільки ті модулі що реально імпортуються в коді:
         # win32gui, win32process (sound_control.py), comtypes (main.py, sound_control.py)
         '--hidden-import=win32gui',
@@ -113,6 +115,13 @@ def build_python() -> bool:
         '--hidden-import=google.genai',
         '--hidden-import=google.genai.types',
         '--hidden-import=google.auth',
+        '--hidden-import=google.auth.transport.requests',
+        # google-calendar — calendar_reader.py
+        '--hidden-import=google.oauth2.credentials',
+        '--hidden-import=google_auth_oauthlib.flow',
+        '--hidden-import=googleapiclient.discovery',
+        '--hidden-import=googleapiclient',
+        '--hidden-import=google_auth_httplib2',
         # Виключаємо наукові бібліотеки — в проекті не використовуються
         '--exclude-module=numpy',
         '--exclude-module=scipy',
@@ -242,7 +251,29 @@ def copy_extra_files():
         shutil.copy2(src_cache, dst_cache)
         print("  [OK] .spotify_cache скопійовано")
 
+    # credentials.json (Ключі Google API)
+    src_creds = BASE_DIR / "credentials.json"
+    dst_creds = DIST_DIR / "credentials.json"
+    if src_creds.exists() and not dst_creds.exists():
+        shutil.copy2(src_creds, dst_creds)
+        print("  [OK] credentials.json скопійовано")
 
+    # .calendar_state.json (Пам'ять календаря)
+    src_cal_state = BASE_DIR / ".calendar_state.json"
+    dst_cal_state = DIST_DIR / ".calendar_state.json"
+    if src_cal_state.exists() and not dst_cal_state.exists():
+        shutil.copy2(src_cal_state, dst_cal_state)
+        print("  [OK] .calendar_state.json скопійовано")
+
+    # calendar_tokens/ (Збережені авторизації)
+    src_tokens = BASE_DIR / "calendar_tokens"
+    dst_tokens = DIST_DIR / "calendar_tokens"
+    if src_tokens.exists():
+        if not dst_tokens.exists():
+            shutil.copytree(src_tokens, dst_tokens)
+            print("  [OK] calendar_tokens/ скопійовано")
+        else:
+            print("  [--] calendar_tokens/ вже є, пропускаємо щоб не затерти")
 # ─── Крок 4: Очищення тимчасових файлів ──────────────────────────────────────
 def cleanup():
     step(4, 4, "Очищення тимчасових файлів")
