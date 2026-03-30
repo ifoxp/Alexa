@@ -25,7 +25,6 @@ class BlackoutSchedulePlugin(SmartPlugin):
 
     def _read_schedule(self) -> list:
         """Читає години відключень з локального файлу."""
-        # Використовуємо 'r' перед рядком, щоб зворотні слеші у шляху Windows читалися правильно
         file_path = r"E:\Programs\EcoFlowStats\schedule.json"
         
         if not os.path.exists(file_path):

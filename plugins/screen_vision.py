@@ -121,19 +121,20 @@ class ScreenVisionPlugin(SmartPlugin):
                     with open(screenshot_path, 'rb') as f:
                         image_data = f.read()
 
-                    response = await smart_ai.smart_assistant.client.aio.models.generate_content(
-                        model=smart_ai.smart_assistant.plugin_model, # Використовуємо твою актуальну модель з smart_ai.py
+                    contents = [
+                        types.Content(role="user", parts=[
+                            types.Part.from_text(text=combined_prompt),
+                            types.Part.from_bytes(data=image_data, mime_type="image/png")
+                        ])
+                    ]
+                    response = await asyncio.to_thread(
+                        smart_ai.smart_assistant.client.models.generate_content,
+                        model=smart_ai.smart_assistant.plugin_model,
                         config=types.GenerateContentConfig(
                             temperature=0.4,
                             response_mime_type="application/json"
                         ),
-                        contents=[
-                            types.Content(role="user", parts=[
-                                # ВИПРАВЛЕНО: додано text=
-                                types.Part.from_text(text=combined_prompt), 
-                                types.Part.from_bytes(data=image_data, mime_type="image/png")
-                            ])
-                        ]
+                        contents=contents
                     )
                 except Exception as e:
                     print(f"[ERROR] Помилка запиту до Gemini Vision API: {e}")

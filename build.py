@@ -111,6 +111,11 @@ def build_python() -> bool:
         # інші плагіни
         '--hidden-import=keyboard',
         '--hidden-import=screen_brightness_control',
+        # mss, pyautogui, pyperclip — screen_vision.py
+        '--hidden-import=mss',
+        '--hidden-import=mss.tools',
+        '--hidden-import=pyautogui',
+        '--hidden-import=pyperclip',
         # google-genai — Gemini SDK
         '--hidden-import=google.genai',
         '--hidden-import=google.genai.types',
@@ -264,6 +269,15 @@ def copy_extra_files():
     if src_cal_state.exists() and not dst_cal_state.exists():
         shutil.copy2(src_cal_state, dst_cal_state)
         print("  [OK] .calendar_state.json скопійовано")
+
+    # schedule.json (Графік відключень світла для blackout_schedule плагіна)
+    src_schedule = BASE_DIR / "schedule.json"
+    dst_schedule = DIST_DIR / "schedule.json"
+    if src_schedule.exists() and not dst_schedule.exists():
+        shutil.copy2(src_schedule, dst_schedule)
+        print("  [OK] schedule.json скопійовано")
+    elif src_schedule.exists():
+        print("  [--] schedule.json вже є в dist, не перезаписуємо")
 
     # calendar_tokens/ (Збережені авторизації)
     src_tokens = BASE_DIR / "calendar_tokens"
