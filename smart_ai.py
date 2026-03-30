@@ -150,7 +150,8 @@ class SmartAssistant:
 
             logger.info(f"Sending to Gemini: {user_text}")
 
-            response = await self.client.aio.models.generate_content(
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
                 model=self.model,
                 contents=user_prompt,
                 config=types.GenerateContentConfig(
@@ -230,10 +231,7 @@ class SmartAssistant:
 
         except Exception as e:
             import traceback
-            logger.error("Single-pass generation failed", extra={
-                "error": str(e),
-                "traceback": traceback.format_exc()
-            })
+            logger.error(f"Single-pass generation failed: {type(e).__name__}: {e}\n{traceback.format_exc()}")
             return {"success": False, "error": f"Помилка ШІ: {str(e)}"}
 
 
