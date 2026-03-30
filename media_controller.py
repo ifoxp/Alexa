@@ -82,7 +82,13 @@ class MediaStateManager:
                     current_vol = vol_ctrl.GetMasterVolume()
                     if current_vol > 0:
                         self._saved_volumes[session.ProcessId] = (current_vol, vol_ctrl)
-                        vol_ctrl.SetMasterVolume(0.0, None)
+                        # Discord — знижуємо до 30%, решта — до 7%
+                        try:
+                            proc_name = psutil.Process(session.ProcessId).name().lower()
+                        except Exception:
+                            proc_name = ""
+                        target_vol = 0.30 if "discord" in proc_name else 0.07
+                        vol_ctrl.SetMasterVolume(target_vol, None)
                 except Exception:
                     continue
 
