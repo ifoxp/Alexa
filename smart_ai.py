@@ -120,8 +120,8 @@ class SmartAssistant:
             if self._gemini_tools is None:
                 self.build_gemini_tools()
 
-            # Формуємо контекст попередніх розмов
-            context_hint = ""
+            # Формуємо контекст попередніх розмов (іде в system, не в user)
+            context_block = ""
             if self.conversation_history and self.last_responses:
                 conversations = []
                 for i in range(min(len(self.conversation_history), len(self.last_responses), 2)):
@@ -132,8 +132,14 @@ class SmartAssistant:
                     )
                 if self.last_active_plugins:
                     conversations[-1] += f"\nВикористані плагіни: {self.last_active_plugins}"
-                context_hint = "\nКОНТЕКСТ:\n" + "\n".join(conversations)
-                context_hint += "\nЯкщо репліка продовжує попередню дію — використовуй ті ж плагіни."
+                context_block = (
+                    "\n\nКОНТЕКСТ ПОПЕРЕДНЬОЇ РОЗМОВИ:\n"
+                    + "\n".join(conversations)
+                    + "\n\nПРАВИЛА ДЛЯ КОНТЕКСТУ:\n"
+                    "- Використовуй ті ж плагіни ТІЛЬКИ якщо нова репліка є чіткою командою або явним продовженням задачі.\n"
+                    "- Якщо репліка — випадкова фраза, прощання, реакція ('прикольно', 'окей'), незрозумілий набір слів або фраза не до тебе — НЕ викликай жодних плагінів, лише speak_response з is_command=false.\n"
+                    "- Ознаки НЕ-команди: 'пока', 'дякую', 'добре', 'ок', 'прикольно', 'все', безглузді слова, суміш мов без сенсу."
+                )
 
             system_instruction = (
                 "Ти — JARVIS, розумний голосовий асистент. "
@@ -141,12 +147,14 @@ class SmartAssistant:
                 "ПРАВИЛА:\n"
                 "1. ЗАВЖДИ викликай speak_response — це голос Jarvis.\n"
                 "2. Якщо репліка містить 'напиши'/'надрукуй'/'введи' — це keyboard_typing.\n"
-                "3. Якщо це чиста розмова (привіт, як справи) — тільки speak_response з is_command=false.\n"
+                "3. Якщо це чиста розмова (привіт, як справи, пока, дякую) — тільки speak_response з is_command=false.\n"
                 "4. Можна викликати кілька функцій одночасно.\n"
-                "5. Відповідь speak_response — ультракоротка, 1-5 слів."
+                "5. Відповідь speak_response — ультракоротка, 1-5 слів.\n"
+                "6. ЗАБОРОНЕНО викликати плагіни на нечіткі, беззмістовні або не адресовані тобі фрази."
+                + context_block
             )
 
-            user_prompt = f'Користувач каже: "{user_text}"{context_hint}'
+            user_prompt = f'Користувач каже: "{user_text}"'
 
             logger.info(f"Sending to Gemini: {user_text}")
 

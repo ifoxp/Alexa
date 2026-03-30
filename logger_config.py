@@ -73,13 +73,15 @@ def setup_logger(name='alexa_assistant', level=logging.WARNING):
         datefmt='%d.%m.%y %H:%M:%S'
     )
 
-    # Консольний handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level)
-    console_handler.setFormatter(logging.Formatter(
-        '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s | %(filename)s:%(lineno)d',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    ))
+    # Консольний handler (тільки якщо є консоль — в exe з --noconsole sys.stdout == None)
+    console_handler = None
+    if sys.stdout is not None:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(level)
+        console_handler.setFormatter(logging.Formatter(
+            '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s | %(filename)s:%(lineno)d',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ))
 
     # main.txt — INFO і вище (системні логи)
     main_handler = logging.FileHandler(logs_dir / "main.txt", encoding='utf-8')
@@ -97,7 +99,8 @@ def setup_logger(name='alexa_assistant', level=logging.WARNING):
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
 
-    logger.addHandler(console_handler)
+    if console_handler:
+        logger.addHandler(console_handler)
     logger.addHandler(main_handler)
     logger.addHandler(error_handler)
     logger.propagate = False
@@ -148,15 +151,27 @@ class capture_plugin_output:
         class PluginStream:
             def write(self, text):
                 buffer.write(text)
-                old_stdout.write(text)
+                if old_stdout is not None:
+                    try:
+                        old_stdout.write(text)
+                    except Exception:
+                        pass
             def flush(self):
                 buffer.flush()
-                old_stdout.flush()
+                if old_stdout is not None:
+                    try:
+                        old_stdout.flush()
+                    except Exception:
+                        pass
 
         class ErrorStream:
             def write(self, text):
                 buffer.write(text)
-                sys.__stderr__.write(text)
+                try:
+                    if sys.__stderr__ is not None:
+                        sys.__stderr__.write(text)
+                except Exception:
+                    pass
                 if text.strip():
                     try:
                         with open(errors_path, 'a', encoding='utf-8') as f:
