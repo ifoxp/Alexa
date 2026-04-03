@@ -23,6 +23,9 @@ class CommandManager:
                     'total_count': ai_result.get('action', {}).get('total_count', 0)
                 })
                 return {'smart_ai': ai_result, 'type': 'smart_ai', 'original_text': text}, None
+            else:
+                # Розмова без команди — повертаємо is_command щоб wake_word міг вирішити зупинятись
+                return {'type': 'casual', 'is_command': ai_result.get('is_command', True)}, None
 
         logger.debug("No smart assistant available", extra={'text': text})
         return None, None

@@ -80,7 +80,7 @@ class CommandLogger:
             except Exception as e:
                 print(f"[CommandLogger] Помилка запису commands.txt: {e}")
 
-    def log_ai_exchange(self, system_prompt: str, user_prompt: str, raw_response):
+    def log_ai_exchange(self, system_prompt: str, user_prompt: str, raw_response, tools=None):
         """Зберігає AI обмін в пам'яті (5 останніх) і записує в commands_ai.txt."""
         try:
             ts = _ts()
@@ -89,7 +89,8 @@ class CommandLogger:
             try:
                 response_parts = []
                 if hasattr(raw_response, 'candidates') and raw_response.candidates:
-                    for part in raw_response.candidates[0].content.parts:
+                    parts = raw_response.candidates[0].content.parts or []
+                    for part in parts:
                         if part.function_call:
                             response_parts.append({
                                 "function_call": part.function_call.name,
@@ -101,11 +102,40 @@ class CommandLogger:
             except Exception:
                 response_str = str(raw_response)
 
+            # Токени з usage_metadata
+            tokens_str = ""
+            try:
+                usage = raw_response.usage_metadata
+                if usage:
+                    input_tokens = getattr(usage, 'prompt_token_count', '?')
+                    output_tokens = getattr(usage, 'candidates_token_count', None)
+                    if output_tokens is None:
+                        total = getattr(usage, 'total_token_count', None)
+                        output_tokens = (total - input_tokens) if (total and input_tokens != '?') else '?'
+                    tokens_str = f"Input: {input_tokens} | Output: {output_tokens} | Total: {getattr(usage, 'total_token_count', '?')}"
+            except Exception:
+                tokens_str = "н/д"
+
+            # Серіалізуємо tools
+            tools_str = ""
+            try:
+                if tools:
+                    tool_lines = []
+                    for tool in tools:
+                        for fd in tool.function_declarations:
+                            tool_lines.append(f"  {fd.name}: {fd.description}")
+                    tools_str = "\n".join(tool_lines)
+                else:
+                    tools_str = "  (не передано)"
+            except Exception:
+                tools_str = "  (помилка серіалізації)"
+
             record = {
                 "ts": ts,
                 "system_prompt": system_prompt,
                 "user_prompt": user_prompt,
-                "response": response_str
+                "response": response_str,
+                "tokens": tokens_str
             }
             self._ai_history.append(record)
 
@@ -114,8 +144,10 @@ class CommandLogger:
                 f"\n{SEP}\n"
                 f"{ts}\n"
                 f"--- SYSTEM PROMPT ---\n{system_prompt}\n\n"
+                f"--- TOOLS ({len([fd for t in (tools or []) for fd in t.function_declarations])} шт.) ---\n{tools_str}\n\n"
                 f"--- USER PROMPT ---\n{user_prompt}\n\n"
-                f"--- ВІДПОВІДЬ GEMINI ---\n{response_str}\n"
+                f"--- ВІДПОВІДЬ GEMINI ---\n{response_str}\n\n"
+                f"--- ТОКЕНИ ---\n{tokens_str}\n"
                 f"{SEP}\n"
             )
 

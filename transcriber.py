@@ -5,7 +5,8 @@ import concurrent.futures
 import threading
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from logger_config import get_logger
-
+import os
+from datetime import datetime
 logger = get_logger('transcriber')
 
 def _find_sr_microphone_index(device_name: str):
@@ -121,20 +122,59 @@ class OnlineTranscriber:
         if not timeout or timeout <= 0:
             return None
 
+        import speed_logger
+        timer = speed_logger.get_session()
+        if timer:
+            timer.on_listen_start()
+
         with self.microphone as source:
-          
             try:
                 print(f" M... (очікую до {timeout:.1f}с)")
-                # Додаємо phrase_time_limit для захоплення довших фраз
                 audio = self.recognizer.listen(
                     source,
                     timeout=timeout,
-                    phrase_time_limit=20  # Максимум 20 секунд на фразу
+                    phrase_time_limit=20,
+                )
+            except sr.WaitTimeoutError:
+                return None
+            
+
+        if timer:
+            timer.on_audio_ready(len(audio.frame_data))
+            timer.on_stt_start()
+
+        result = self._recognize_with_retry(audio)
+
+        if timer:
+            timer.on_stt_done(result or "")
+
+        return result
+
+    def listen_and_get_audio(self, timeout):
+        """Слухає одну фразу і повертає WAV байти (без STT). Для Gemini Native Audio."""
+        if not timeout or timeout <= 0:
+            return None
+
+        import speed_logger
+        timer = speed_logger.get_session()
+        if timer:
+            timer.on_listen_start()
+
+        with self.microphone as source:
+            try:
+                print(f" M... (очікую до {timeout:.1f}с)")
+                audio = self.recognizer.listen(
+                    source,
+                    timeout=timeout,
+                    phrase_time_limit=20,
                 )
             except sr.WaitTimeoutError:
                 return None
 
-        return self._recognize_with_retry(audio)
+        wav = audio.get_wav_data()
+        if timer:
+            timer.on_audio_ready(len(wav))
+        return wav
 
     @retry(
         stop=stop_after_attempt(3),
@@ -229,3 +269,20 @@ class OnlineTranscriber:
 
             # Коротка пауза перед наступною спробою
             await asyncio.sleep(0.2)
+    def _save_debug_audio(self, audio, prefix="audio"):
+        """Тимчасове збереження аудіофайлу для аналізу (дебаг)"""
+        try:
+            # Створюємо папку в logs, якщо її ще немає
+            os.makedirs("logs/audio_debug", exist_ok=True)
+            
+            # Генеруємо унікальне ім'я з таймстемпом
+            timestamp = datetime.now().strftime("%H-%M-%S")
+            filepath = f"logs/audio_debug/{prefix}_{timestamp}.wav"
+            
+            # Зберігаємо сирі байти у WAV файл
+            with open(filepath, "wb") as f:
+                f.write(audio.get_wav_data())
+                
+            print(f"🎧 [DEBUG AUDIO] Збережено: {filepath}")
+        except Exception as e:
+            print(f"🎧 [DEBUG AUDIO] Помилка збереження: {e}")

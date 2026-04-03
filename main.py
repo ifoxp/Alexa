@@ -177,7 +177,9 @@ def main():
             openai_key = config.get("openaiApiKey", "").strip()
 
             if openai_key and openai_key != "YOUR_OPENAI_API_KEY_HERE":
-                if smart_ai.initialize_smart_assistant(openai_key):
+                routing_model = config.get("routingModel", "").strip() or None
+                plugin_model = config.get("pluginModel", "").strip() or None
+                if smart_ai.initialize_smart_assistant(openai_key, routing_model=routing_model, plugin_model=plugin_model):
                     logger.info("Smart AI assistant enabled")
                     # Прогріваємо плагіни при старті щоб перша команда не мала затримки
                     try:

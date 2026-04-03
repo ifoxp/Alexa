@@ -7,7 +7,6 @@ import pygame
 import subprocess
 import time
 import tempfile
-import edge_tts
 
 logger = get_logger('audio_player')
 
@@ -85,6 +84,7 @@ class EdgeTTS:
 
                 if result.returncode == 0:
                     # Відтворюємо файл
+                    print(f"[TTS] music.load + play: {text[:40]!r}")
                     pygame.mixer.music.load(temp_path)
                     pygame.mixer.music.play()
 
@@ -92,10 +92,12 @@ class EdgeTTS:
                     while pygame.mixer.music.get_busy():
                         time.sleep(0.1)
 
+                    print(f"[TTS] done playing: {text[:40]!r}")
                     logger.debug(f"Edge TTS played: {text[:50]}...")
                     return True
                 else:
                     logger.error(f"Edge TTS command failed: {result.stderr}")
+                    print(f"[TTS] subprocess failed (rc={result.returncode}): {result.stderr[:100]}")
                     return False
 
             finally:

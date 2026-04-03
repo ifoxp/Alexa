@@ -84,7 +84,7 @@ class EntertainmentPlugin(SmartPlugin):
 Приклад вайбу: "Купив потужну відеокарту, щоб працювати швидше... Тепер ігри завантажуються так швидко, що я не встигаю читати підказки на екрані."
 """
 
-            generated_joke = await self.ask_gpt(prompt, max_tokens=150, temperature=0.9)
+            generated_joke = await self.ask_gpt(prompt, max_tokens=250, temperature=0.9)
 
             return {
                 "success": True,
@@ -117,7 +117,7 @@ class EntertainmentPlugin(SmartPlugin):
 
 ФОРМАТ: Тільки текст факту з паузами."""
 
-            generated_fact = await self.ask_gpt(prompt, max_tokens=200, temperature=0.8)
+            generated_fact = await self.ask_gpt(prompt, max_tokens=300, temperature=0.8)
 
             return {
                 "success": True,

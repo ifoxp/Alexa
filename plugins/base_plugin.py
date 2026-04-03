@@ -97,7 +97,9 @@ class SmartPlugin(ABC):
                 )
             )
 
-            return response.text.strip()
+            text = response.text
+            print(f"[ask_gpt] model={smart_ai.smart_assistant.plugin_model} finish_reason={response.candidates[0].finish_reason if response.candidates else 'N/A'} text={text!r:.100}")
+            return text.strip() if text else ""
 
         except Exception as e:
             self.log_error(f"Gemini request failed", error=str(e))

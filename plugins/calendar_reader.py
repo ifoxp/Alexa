@@ -181,12 +181,12 @@ class CalendarPlugin(SmartPlugin):
                     upcoming_birthdays.append(f"{summary} буде {date_obj.strftime('%d.%m')}")
 
             # Формуємо текст для GPT
-            prompt = f"Ти Jarvis. Склади дуже короткий ранковий брифінг. Події сьогодні: {today_events}. Дні народження найближчим часом: {upcoming_birthdays}. Скажи це красиво, українською мовою. Якщо подій немає, скажи, що день вільний."
+            prompt = f"Ти помічник. Склади дуже короткий ранковий брифінг. Події сьогодні: {today_events}. Дні народження найближчим часом: {upcoming_birthdays}. Скажи це красиво, українською мовою. Якщо подій немає, скажи, що день вільний."
             
             # Якщо є події або дні народження — озвучуємо
             if today_events or upcoming_birthdays:
                 try:
-                    briefing_text = await self.ask_gpt(prompt, max_tokens=150)
+                    briefing_text = await self.ask_gpt(prompt, max_tokens=300)
                     import config_manager as cfg
                     config = cfg.load_config() if hasattr(cfg, 'load_config') else {}
                     speak_text(briefing_text, config)
