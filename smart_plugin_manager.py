@@ -198,6 +198,26 @@ def discover_plugins() -> List[type]:
     return plugin_classes
 
 
+def _load_disabled_plugins() -> set:
+    """Читає список вимкнених плагінів з config.json."""
+    import json
+    try:
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+        if not os.path.exists(config_path):
+            # exe-режим: шукаємо config.json поруч з exe
+            config_path = os.path.join(os.path.dirname(sys.executable), 'config.json')
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            disabled = data.get('disabledPlugins', [])
+            if disabled:
+                logger.info(f"Disabled plugins from config: {disabled}")
+            return set(disabled)
+    except Exception as e:
+        logger.warning(f"Could not read disabledPlugins from config: {e}")
+    return set()
+
+
 class SmartPluginManager:
     """Менеджер розумних плагінів для GPT-інтеграції."""
 
@@ -206,7 +226,9 @@ class SmartPluginManager:
         self.load_plugins()
 
     def load_plugins(self):
-        """Завантажує всі доступні плагіни."""
+        """Завантажує всі доступні плагіни (крім вимкнених у config.json)."""
+        disabled_plugins = _load_disabled_plugins()
+
         if hasattr(sys, '_MEIPASS'):
             # В exe-режимі плагіни як .py файли поруч з exe — завантажуємо динамічно
             available_plugins = discover_plugins()
@@ -234,6 +256,9 @@ class SmartPluginManager:
                 plugin_name = plugin_instance.name
                 plugin_description = plugin_instance.description
 
+                if plugin_name in disabled_plugins:
+                    logger.info(f"Skipping disabled plugin: {plugin_name}")
+                    continue
 
                 self.plugins[plugin_name] = plugin_instance
 

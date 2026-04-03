@@ -20,6 +20,7 @@ namespace AlexaSettings
             tabWakeWord = new TabPage();
             tabModel = new TabPage();
             tabListening = new TabPage();
+            tabPlugins = new TabPage();
             tabSystem = new TabPage();
 
             // System tab
@@ -65,6 +66,19 @@ namespace AlexaSettings
             trackSensitivity = new TrackBar();
             lblSensitivityValue = new Label();
             lblSensitivityHint = new Label();
+
+            // AI model fields
+            chkUseGeminiSTT = new CheckBox();
+            lblUseGeminiSTTHint = new Label();
+            lblRoutingModel = new Label();
+            txtRoutingModel = new TextBox();
+            lblRoutingModelHint = new Label();
+            lblPluginModel = new Label();
+            txtPluginModel = new TextBox();
+            lblPluginModelHint = new Label();
+
+            // Plugins tab
+            pnlPlugins = new Panel();
 
             // Model / TTS / Languages
             chkTtsEnabled = new CheckBox();
@@ -112,7 +126,7 @@ namespace AlexaSettings
             // FORM
             // ==============================
             Text = "Alexa — Налаштування";
-            ClientSize = new Size(600, 510);
+            ClientSize = new Size(700, 510);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -123,10 +137,10 @@ namespace AlexaSettings
             // TAB CONTROL
             // ==============================
             tabControl.Location = new Point(10, 10);
-            tabControl.Size = new Size(578, 450);
+            tabControl.Size = new Size(678, 450);
             tabControl.Font = new Font("Segoe UI", 9.5f);
             tabControl.TabPages.AddRange(new TabPage[] {
-                tabMicrophone, tabTokens, tabWakeWord, tabModel, tabListening, tabSystem
+                tabMicrophone, tabTokens, tabWakeWord, tabModel, tabListening, tabPlugins, tabSystem
             });
 
             tabMicrophone.Text = "  Мікрофон  ";
@@ -134,6 +148,7 @@ namespace AlexaSettings
             tabWakeWord.Text = "  Слово-тригер  ";
             tabModel.Text = "  Голос / ШІ  ";
             tabListening.Text = "  Слухання  ";
+            tabPlugins.Text = "  Плагіни  ";
             tabSystem.Text = "  Система  ";
 
             foreach (TabPage tp in tabControl.TabPages)
@@ -147,7 +162,7 @@ namespace AlexaSettings
             // ==============================
             lblMicrophoneDesc.Text = "Оберіть мікрофон, який буде слухати голосові команди.\nЯкщо залишити «За замовчуванням» — використовується мікрофон, вибраний у системі Windows.";
             lblMicrophoneDesc.Location = new Point(lx, 18);
-            lblMicrophoneDesc.Size = new Size(530, 38);
+            lblMicrophoneDesc.Size = new Size(630, 38);
             lblMicrophoneDesc.ForeColor = hintColor;
 
             lblMicrophone.Text = "Мікрофон:";
@@ -156,7 +171,7 @@ namespace AlexaSettings
             lblMicrophone.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
             cmbMicrophone.Location = new Point(lx, 88);
-            cmbMicrophone.Size = new Size(530, 26);
+            cmbMicrophone.Size = new Size(630, 26);
             cmbMicrophone.DropDownStyle = ComboBoxStyle.DropDownList;
 
             // Mic volume slider
@@ -166,7 +181,7 @@ namespace AlexaSettings
             lblMicVolumeLabel.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
             trackMicVolume.Location = new Point(lx, 152);
-            trackMicVolume.Size = new Size(450, 35);
+            trackMicVolume.Size = new Size(550, 35);
             trackMicVolume.Minimum = 0;
             trackMicVolume.Maximum = 100;
             trackMicVolume.TickFrequency = 10;
@@ -174,13 +189,13 @@ namespace AlexaSettings
             trackMicVolume.Scroll += trackMicVolume_Scroll;
 
             lblMicVolumeValue.Text = "100%";
-            lblMicVolumeValue.Location = new Point(lx + 462, 162);
+            lblMicVolumeValue.Location = new Point(lx + 562, 162);
             lblMicVolumeValue.AutoSize = true;
             lblMicVolumeValue.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
 
             lblMicVolumeHint.Text = "Змінює системну гучність мікрофону (Windows). Зберігається в config.json і застосовується при старті.";
             lblMicVolumeHint.Location = new Point(lx, 192);
-            lblMicVolumeHint.Size = new Size(530, 20);
+            lblMicVolumeHint.Size = new Size(630, 20);
             lblMicVolumeHint.ForeColor = hintColor;
 
             // Mic test section
@@ -190,7 +205,7 @@ namespace AlexaSettings
             lblMicTestTitle.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
             pbMicLevel.Location = new Point(lx, 250);
-            pbMicLevel.Size = new Size(450, 22);
+            pbMicLevel.Size = new Size(550, 22);
             pbMicLevel.Minimum = 0;
             pbMicLevel.Maximum = 100;
             pbMicLevel.Value = 0;
@@ -198,7 +213,7 @@ namespace AlexaSettings
             pbMicLevel.ForeColor = Color.FromArgb(37, 150, 90);
 
             btnMicTest.Text = "▶ Почати тест";
-            btnMicTest.Location = new Point(lx + 456, 248);
+            btnMicTest.Location = new Point(lx + 556, 248);
             btnMicTest.Size = new Size(74, 26);
             btnMicTest.FlatStyle = FlatStyle.Flat;
             btnMicTest.Font = new Font("Segoe UI", 8.5f);
@@ -207,7 +222,7 @@ namespace AlexaSettings
 
             lblMicLevelHint.Text = "Говоріть в мікрофон — шкала покаже рівень гучності як чує його програма.";
             lblMicLevelHint.Location = new Point(lx, 278);
-            lblMicLevelHint.Size = new Size(530, 20);
+            lblMicLevelHint.Size = new Size(630, 20);
             lblMicLevelHint.ForeColor = hintColor;
 
             tabMicrophone.Controls.AddRange(new Control[] {
@@ -225,11 +240,11 @@ namespace AlexaSettings
             lblPicovoiceKey.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
             txtPicovoiceKey.Location = new Point(lx, 38);
-            txtPicovoiceKey.Size = new Size(462, 26);
+            txtPicovoiceKey.Size = new Size(562, 26);
             txtPicovoiceKey.UseSystemPasswordChar = true;
 
             btnPicovoiceEye.Text = "👁";
-            btnPicovoiceEye.Location = new Point(lx + 466, 37);
+            btnPicovoiceEye.Location = new Point(lx + 566, 37);
             btnPicovoiceEye.Size = new Size(30, 28);
             btnPicovoiceEye.FlatStyle = FlatStyle.Flat;
             btnPicovoiceEye.FlatAppearance.BorderSize = 1;
@@ -239,7 +254,7 @@ namespace AlexaSettings
             btnPicovoiceEye.Click += btnEye_Click;
 
             btnPicovoiceCopy.Text = "📋";
-            btnPicovoiceCopy.Location = new Point(lx + 500, 37);
+            btnPicovoiceCopy.Location = new Point(lx + 600, 37);
             btnPicovoiceCopy.Size = new Size(30, 28);
             btnPicovoiceCopy.FlatStyle = FlatStyle.Flat;
             btnPicovoiceCopy.FlatAppearance.BorderSize = 1;
@@ -259,11 +274,11 @@ namespace AlexaSettings
             lblOpenAiKey.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
             txtOpenAiKey.Location = new Point(lx, 138);
-            txtOpenAiKey.Size = new Size(462, 26);
+            txtOpenAiKey.Size = new Size(562, 26);
             txtOpenAiKey.UseSystemPasswordChar = true;
 
             btnOpenAiEye.Text = "👁";
-            btnOpenAiEye.Location = new Point(lx + 466, 137);
+            btnOpenAiEye.Location = new Point(lx + 566, 137);
             btnOpenAiEye.Size = new Size(30, 28);
             btnOpenAiEye.FlatStyle = FlatStyle.Flat;
             btnOpenAiEye.FlatAppearance.BorderSize = 1;
@@ -273,7 +288,7 @@ namespace AlexaSettings
             btnOpenAiEye.Click += btnEye_Click;
 
             btnOpenAiCopy.Text = "📋";
-            btnOpenAiCopy.Location = new Point(lx + 500, 137);
+            btnOpenAiCopy.Location = new Point(lx + 600, 137);
             btnOpenAiCopy.Size = new Size(30, 28);
             btnOpenAiCopy.FlatStyle = FlatStyle.Flat;
             btnOpenAiCopy.FlatAppearance.BorderSize = 1;
@@ -284,7 +299,7 @@ namespace AlexaSettings
 
             lblOpenAiKeyHint.Text = "Ключ для ШІ-асистента (Gemini). Якщо порожньо або ШІ вимкнений — Gemini не використовується.\nОтримати на aistudio.google.com.";
             lblOpenAiKeyHint.Location = new Point(lx, 170);
-            lblOpenAiKeyHint.Size = new Size(530, 34);
+            lblOpenAiKeyHint.Size = new Size(630, 34);
             lblOpenAiKeyHint.ForeColor = hintColor;
 
             tabTokens.Controls.AddRange(new Control[] {
@@ -326,16 +341,16 @@ namespace AlexaSettings
             lblCustomWakeWordPath.AutoSize = true;
 
             txtCustomWakeWordPath.Location = new Point(lx + 20, 130);
-            txtCustomWakeWordPath.Size = new Size(400, 26);
+            txtCustomWakeWordPath.Size = new Size(500, 26);
 
             btnBrowsePpn.Text = "Огляд...";
-            btnBrowsePpn.Location = new Point(lx + 430, 130);
+            btnBrowsePpn.Location = new Point(lx + 530, 130);
             btnBrowsePpn.Size = new Size(80, 26);
             btnBrowsePpn.Click += btnBrowsePpn_Click;
 
             lblCustomWakeWordHint.Text = "Власну .ppn модель можна створити на console.picovoice.ai для будь-якого слова і мови.";
             lblCustomWakeWordHint.Location = new Point(lx + 20, 160);
-            lblCustomWakeWordHint.Size = new Size(510, 20);
+            lblCustomWakeWordHint.Size = new Size(610, 20);
             lblCustomWakeWordHint.ForeColor = hintColor;
 
             lblSensitivity.Text = "Чутливість розпізнавання слова-тригера:";
@@ -344,20 +359,20 @@ namespace AlexaSettings
             lblSensitivity.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
             trackSensitivity.Location = new Point(lx, 218);
-            trackSensitivity.Size = new Size(450, 35);
+            trackSensitivity.Size = new Size(550, 35);
             trackSensitivity.Minimum = 0;
             trackSensitivity.Maximum = 100;
             trackSensitivity.TickFrequency = 10;
             trackSensitivity.Scroll += trackSensitivity_Scroll;
 
             lblSensitivityValue.Text = "0.50";
-            lblSensitivityValue.Location = new Point(lx + 462, 228);
+            lblSensitivityValue.Location = new Point(lx + 562, 228);
             lblSensitivityValue.AutoSize = true;
             lblSensitivityValue.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
 
             lblSensitivityHint.Text = "Менше (0.0) → рідше хибні спрацювання.  Більше (1.0) → краще чує, але більше помилок.";
             lblSensitivityHint.Location = new Point(lx, 258);
-            lblSensitivityHint.Size = new Size(530, 20);
+            lblSensitivityHint.Size = new Size(630, 20);
             lblSensitivityHint.ForeColor = hintColor;
 
             tabWakeWord.Controls.AddRange(new Control[] {
@@ -377,7 +392,7 @@ namespace AlexaSettings
 
             lblTtsHint.Text = "Асистент вимовлятиме відповіді вголос. Якщо вимкнено — лише звукові сигнали (listen.wav / end.wav).";
             lblTtsHint.Location = new Point(lx + 20, 42);
-            lblTtsHint.Size = new Size(520, 20);
+            lblTtsHint.Size = new Size(620, 20);
             lblTtsHint.ForeColor = hintColor;
 
             lblTtsVoice.Text = "Голос для озвучення:";
@@ -392,7 +407,7 @@ namespace AlexaSettings
 
             lblTtsVoiceHint.Text = "Голос Microsoft Edge TTS. Українські голоси: Остап (чоловічий), Поліна (жіночий).";
             lblTtsVoiceHint.Location = new Point(lx, 125);
-            lblTtsVoiceHint.Size = new Size(520, 20);
+            lblTtsVoiceHint.Size = new Size(620, 20);
             lblTtsVoiceHint.ForeColor = hintColor;
 
             lblTtsRate.Text = "Швидкість мовлення:";
@@ -405,7 +420,7 @@ namespace AlexaSettings
 
             lblTtsRateHint.Text = "Наприклад: +25% (швидше), -10% (повільніше), 0% (нормально).";
             lblTtsRateHint.Location = new Point(lx, 208);
-            lblTtsRateHint.Size = new Size(520, 20);
+            lblTtsRateHint.Size = new Size(620, 20);
             lblTtsRateHint.ForeColor = hintColor;
 
             lblLanguagesTitle.Text = "Мови розпізнавання (активні одночасно):";
@@ -415,21 +430,64 @@ namespace AlexaSettings
 
             lblLanguagesHint.Text = "Асистент пробує розпізнати мовлення на всіх обраних мовах одночасно і бере найкращий результат.";
             lblLanguagesHint.Location = new Point(lx, 264);
-            lblLanguagesHint.Size = new Size(520, 20);
+            lblLanguagesHint.Size = new Size(620, 20);
             lblLanguagesHint.ForeColor = hintColor;
 
             pnlLanguages.Location = new Point(lx, 288);
-            pnlLanguages.Size = new Size(530, 80);
+            pnlLanguages.Size = new Size(630, 80);
             pnlLanguages.FlowDirection = FlowDirection.LeftToRight;
             pnlLanguages.WrapContents = true;
             pnlLanguages.AutoSize = false;
             pnlLanguages.BackColor = Color.Transparent;
 
+            // Gemini STT / AI model settings — below languages panel (y=375)
+            chkUseGeminiSTT.Text = "Розпізнавання через Gemini STT (замість Google STT)";
+            chkUseGeminiSTT.Location = new Point(lx, 375);
+            chkUseGeminiSTT.AutoSize = true;
+            chkUseGeminiSTT.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            lblUseGeminiSTTHint.Text = "Надсилає аудіо напряму до Gemini замість Google Speech-to-Text. Точніше для нечіткої мови.";
+            lblUseGeminiSTTHint.Location = new Point(lx + 20, 397);
+            lblUseGeminiSTTHint.Size = new Size(620, 18);
+            lblUseGeminiSTTHint.ForeColor = hintColor;
+
+            lblRoutingModel.Text = "Модель маршрутизації (routingModel):";
+            lblRoutingModel.Location = new Point(lx, 422);
+            lblRoutingModel.AutoSize = true;
+            lblRoutingModel.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            txtRoutingModel.Location = new Point(lx, 442);
+            txtRoutingModel.Size = new Size(630, 26);
+            txtRoutingModel.PlaceholderText = "gemini-2.5-flash (за замовчуванням)";
+
+            lblRoutingModelHint.Text = "Модель для вибору плагінів. Порожньо = стандартна. Приклад: gemini-2.5-pro";
+            lblRoutingModelHint.Location = new Point(lx, 472);
+            lblRoutingModelHint.Size = new Size(630, 18);
+            lblRoutingModelHint.ForeColor = hintColor;
+
+            lblPluginModel.Text = "Модель для плагінів (pluginModel):";
+            lblPluginModel.Location = new Point(lx, 497);
+            lblPluginModel.AutoSize = true;
+            lblPluginModel.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            txtPluginModel.Location = new Point(lx, 517);
+            txtPluginModel.Size = new Size(630, 26);
+            txtPluginModel.PlaceholderText = "gemini-2.5-flash (за замовчуванням)";
+
+            lblPluginModelHint.Text = "Модель для виконання плагінів (анекдоти, пошук тощо). Порожньо = стандартна.";
+            lblPluginModelHint.Location = new Point(lx, 547);
+            lblPluginModelHint.Size = new Size(630, 18);
+            lblPluginModelHint.ForeColor = hintColor;
+
+            tabModel.AutoScroll = true;
             tabModel.Controls.AddRange(new Control[] {
                 chkTtsEnabled, lblTtsHint,
                 lblTtsVoice, cmbTtsVoice, lblTtsVoiceHint,
                 lblTtsRate, txtTtsRate, lblTtsRateHint,
-                lblLanguagesTitle, lblLanguagesHint, pnlLanguages
+                lblLanguagesTitle, lblLanguagesHint, pnlLanguages,
+                chkUseGeminiSTT, lblUseGeminiSTTHint,
+                lblRoutingModel, txtRoutingModel, lblRoutingModelHint,
+                lblPluginModel, txtPluginModel, lblPluginModelHint
             });
 
             // ==============================
@@ -442,14 +500,14 @@ namespace AlexaSettings
             lblCommandTimeout.AutoSize = true;
             lblCommandTimeout.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
-            nudCommandTimeout.Location = new Point(440, row(0) - 2);
+            nudCommandTimeout.Location = new Point(540, row(0) - 2);
             nudCommandTimeout.Size = new Size(80, 26);
             nudCommandTimeout.Minimum = 1;
             nudCommandTimeout.Maximum = 120;
 
             lblCommandTimeoutHint.Text = "Скільки секунд чекати на команду після спрацювання слова-тригера.\nЯкщо нічого не сказано — сесія закривається автоматично.";
             lblCommandTimeoutHint.Location = new Point(lx, row(0) + 22);
-            lblCommandTimeoutHint.Size = new Size(420, 34);
+            lblCommandTimeoutHint.Size = new Size(520, 34);
             lblCommandTimeoutHint.ForeColor = hintColor;
 
             lblContinuousListen.Text = "Продовження сесії після команди (секунди):";
@@ -457,14 +515,14 @@ namespace AlexaSettings
             lblContinuousListen.AutoSize = true;
             lblContinuousListen.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
-            nudContinuousListen.Location = new Point(440, row(1) - 2);
+            nudContinuousListen.Location = new Point(540, row(1) - 2);
             nudContinuousListen.Size = new Size(80, 26);
             nudContinuousListen.Minimum = 1;
             nudContinuousListen.Maximum = 60;
 
             lblContinuousListenHint.Text = "Після виконання команди сесія продовжується на цей час — можна сказати ще одну команду.";
             lblContinuousListenHint.Location = new Point(lx, row(1) + 22);
-            lblContinuousListenHint.Size = new Size(420, 20);
+            lblContinuousListenHint.Size = new Size(520, 20);
             lblContinuousListenHint.ForeColor = hintColor;
 
             lblSilenceDetect.Text = "Тиша для зупинки запису (секунди):";
@@ -472,7 +530,7 @@ namespace AlexaSettings
             lblSilenceDetect.AutoSize = true;
             lblSilenceDetect.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
-            nudSilenceDetect.Location = new Point(440, row(2) - 2);
+            nudSilenceDetect.Location = new Point(540, row(2) - 2);
             nudSilenceDetect.Size = new Size(80, 26);
             nudSilenceDetect.Minimum = 0;
             nudSilenceDetect.Maximum = 30;
@@ -481,7 +539,7 @@ namespace AlexaSettings
 
             lblSilenceDetectHint.Text = "Якщо мікрофон мовчить довше цього часу — запис команди зупиняється і відправляється на розпізнавання.";
             lblSilenceDetectHint.Location = new Point(lx, row(2) + 22);
-            lblSilenceDetectHint.Size = new Size(420, 20);
+            lblSilenceDetectHint.Size = new Size(520, 20);
             lblSilenceDetectHint.ForeColor = hintColor;
 
             lblSilenceTimeout.Text = "Загальний таймаут тиші (секунди):";
@@ -489,7 +547,7 @@ namespace AlexaSettings
             lblSilenceTimeout.AutoSize = true;
             lblSilenceTimeout.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
-            nudSilenceTimeout.Location = new Point(440, row(3) - 2);
+            nudSilenceTimeout.Location = new Point(540, row(3) - 2);
             nudSilenceTimeout.Size = new Size(80, 26);
             nudSilenceTimeout.Minimum = 0;
             nudSilenceTimeout.Maximum = 60;
@@ -498,7 +556,7 @@ namespace AlexaSettings
 
             lblSilenceTimeoutHint.Text = "Максимальний час тиші в сесії загалом до її примусового завершення.";
             lblSilenceTimeoutHint.Location = new Point(lx, row(3) + 22);
-            lblSilenceTimeoutHint.Size = new Size(420, 20);
+            lblSilenceTimeoutHint.Size = new Size(520, 20);
             lblSilenceTimeoutHint.ForeColor = hintColor;
 
             tabListening.Controls.AddRange(new Control[] {
@@ -524,7 +582,7 @@ namespace AlexaSettings
 
             lblAutostartPath.Text = "Шлях до exe: не знайдено";
             lblAutostartPath.Location = new Point(lx, 112);
-            lblAutostartPath.Size = new Size(530, 18);
+            lblAutostartPath.Size = new Size(630, 18);
             lblAutostartPath.ForeColor = Color.FromArgb(130, 130, 140);
             lblAutostartPath.Font = new Font("Segoe UI", 8.5f);
 
@@ -533,21 +591,32 @@ namespace AlexaSettings
             });
 
             // ==============================
+            // TAB: ПЛАГІНИ
+            // ==============================
+            pnlPlugins.Location = new Point(0, 0);
+            pnlPlugins.Size = new Size(660, 420);
+            pnlPlugins.AutoScroll = true;
+            pnlPlugins.BackColor = Color.Transparent;
+
+            tabPlugins.AutoScroll = true;
+            tabPlugins.Controls.Add(pnlPlugins);
+
+            // ==============================
             // BOTTOM BUTTONS
             // ==============================
             lblConfigPath.Text = "";
             lblConfigPath.Location = new Point(12, 468);
-            lblConfigPath.Size = new Size(400, 18);
+            lblConfigPath.Size = new Size(490, 18);
             lblConfigPath.ForeColor = hintColor;
             lblConfigPath.Font = new Font("Segoe UI", 8f);
 
             btnReload.Text = "Перезавантажити";
-            btnReload.Location = new Point(415, 463);
+            btnReload.Location = new Point(515, 463);
             btnReload.Size = new Size(85, 32);
             btnReload.Click += btnReload_Click;
 
             btnSave.Text = "Зберегти";
-            btnSave.Location = new Point(507, 463);
+            btnSave.Location = new Point(607, 463);
             btnSave.Size = new Size(85, 32);
             btnSave.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             btnSave.BackColor = Color.FromArgb(37, 99, 235);
@@ -571,7 +640,7 @@ namespace AlexaSettings
 
         // Controls
         private TabControl tabControl;
-        private TabPage tabMicrophone, tabTokens, tabWakeWord, tabModel, tabListening;
+        private TabPage tabMicrophone, tabTokens, tabWakeWord, tabModel, tabListening, tabPlugins;
 
         private Label lblMicrophoneDesc, lblMicrophone;
         private ComboBox cmbMicrophone;
@@ -600,6 +669,15 @@ namespace AlexaSettings
         private ComboBox cmbTtsVoice;
         private TextBox txtTtsRate;
         private FlowLayoutPanel pnlLanguages;
+
+        private CheckBox chkUseGeminiSTT;
+        private Label lblUseGeminiSTTHint;
+        private Label lblRoutingModel, lblRoutingModelHint;
+        private TextBox txtRoutingModel;
+        private Label lblPluginModel, lblPluginModelHint;
+        private TextBox txtPluginModel;
+
+        private Panel pnlPlugins;
 
         private Label lblCommandTimeout, lblCommandTimeoutHint;
         private Label lblContinuousListen, lblContinuousListenHint;

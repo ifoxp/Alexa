@@ -13,6 +13,12 @@ namespace AlexaSettings
         // Чекбокси мов — будуємо динамічно
         private readonly Dictionary<string, CheckBox> _langCheckboxes = new();
 
+        // Чекбокси плагінів — будуємо динамічно
+        private readonly Dictionary<string, CheckBox> _pluginCheckboxes = new();
+
+        // Підказки для бейджів команд
+        private readonly ToolTip toolTip = new();
+
         // Ключ реєстру для автозапуску
         private const string AutostartRegKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private const string AutostartAppName = "AlexaAssistant";
@@ -31,6 +37,7 @@ namespace AlexaSettings
 
             InitVoiceCombo();
             BuildLanguageCheckboxes();
+            BuildPluginsTab();
             LoadMicrophones();
             LoadConfig();
             LoadAutostartState();
@@ -83,6 +90,142 @@ namespace AlexaSettings
                 _langCheckboxes[kv.Key] = chk;
                 pnlLanguages.Controls.Add(chk);
             }
+        }
+
+        /// <summary>Будує вкладку Плагіни — читає дані прямо з .py файлів.</summary>
+        private void BuildPluginsTab()
+        {
+            pnlPlugins.Controls.Clear();
+            _pluginCheckboxes.Clear();
+
+            var plugins = PluginParser.LoadAll();
+
+            if (plugins.Count == 0)
+            {
+                var lbl = new Label
+                {
+                    Text = "Папку plugins/ не знайдено поруч з AlexaSettings.exe.\nЗапустіть після білду, коли plugins/ буде поряд.",
+                    Location = new Point(16, 20),
+                    Size = new Size(600, 40),
+                    ForeColor = Color.FromArgb(180, 60, 60),
+                    Font = new Font("Segoe UI", 9.5f),
+                };
+                pnlPlugins.Controls.Add(lbl);
+                return;
+            }
+
+            Color bgEven     = Color.FromArgb(250, 250, 253);
+            Color bgOdd      = Color.FromArgb(243, 245, 250);
+            Color accentOn   = Color.FromArgb(37, 99, 235);
+            Color descColor  = Color.FromArgb(80, 85, 100);
+            Color cmdColor   = Color.FromArgb(55, 100, 170);
+            Color cmdBg      = Color.FromArgb(235, 242, 255);
+            int   cardWidth  = pnlPlugins.Width - 20;
+            int   y          = 8;
+            int   idx        = 0;
+
+            foreach (var info in plugins)
+            {
+                // Обчислюємо висоту картки: 34 (header) + 20*descLines + 24*cmdCount + 8 (padding)
+                int descLines = (int)Math.Ceiling(info.Description.Length / 80.0);
+                int descH     = Math.Max(20, descLines * 18);
+                int cardH     = 36 + descH + info.Commands.Count * 24 + 14;
+
+                Color cardBg = (idx % 2 == 0) ? bgEven : bgOdd;
+
+                // Картка-панель
+                var card = new Panel
+                {
+                    Location    = new Point(8, y),
+                    Size        = new Size(cardWidth, cardH),
+                    BackColor   = cardBg,
+                };
+
+                // Ліва кольорова смужка
+                var stripe = new Panel
+                {
+                    Location  = new Point(0, 0),
+                    Size      = new Size(4, cardH),
+                    BackColor = accentOn,
+                };
+                card.Controls.Add(stripe);
+
+                // Чекбокс з назвою
+                var chk = new CheckBox
+                {
+                    Text     = info.PluginName,
+                    Tag      = info.PluginName,
+                    Checked  = true,
+                    AutoSize = false,
+                    Width    = cardWidth - 14,
+                    Height   = 26,
+                    Location = new Point(12, 4),
+                    Font     = new Font("Segoe UI", 10f, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(25, 35, 55),
+                    BackColor = Color.Transparent,
+                };
+                chk.CheckedChanged += (s, e) =>
+                {
+                    stripe.BackColor = chk.Checked ? accentOn : Color.FromArgb(190, 190, 200);
+                };
+                _pluginCheckboxes[info.PluginName] = chk;
+                card.Controls.Add(chk);
+
+                // Опис
+                int cy = 32;
+                var lblDesc = new Label
+                {
+                    Text      = info.Description,
+                    Location  = new Point(14, cy),
+                    Size      = new Size(cardWidth - 22, descH),
+                    ForeColor = descColor,
+                    Font      = new Font("Segoe UI", 8.5f),
+                    BackColor = Color.Transparent,
+                };
+                card.Controls.Add(lblDesc);
+                cy += descH + 4;
+
+                // Команди — бейджі
+                foreach (var cmd in info.Commands)
+                {
+                    var badge = new Label
+                    {
+                        Text      = $"  {cmd.Key}  ",
+                        Location  = new Point(14, cy),
+                        AutoSize  = true,
+                        ForeColor = cmdColor,
+                        BackColor = cmdBg,
+                        Font      = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                        Padding   = new Padding(2, 1, 2, 1),
+                        Cursor    = Cursors.Help,
+                        Tag       = cmd.Value,
+                    };
+                    badge.MouseEnter += (s, e) =>
+                    {
+                        if (s is Label b) toolTip.SetToolTip(b, b.Tag?.ToString() ?? "");
+                    };
+                    card.Controls.Add(badge);
+
+                    // Підказка-текст команди праворуч від бейджа
+                    var lblCmdDesc = new Label
+                    {
+                        Text      = cmd.Value,
+                        Location  = new Point(badge.Left + 80, cy + 1),
+                        Size      = new Size(cardWidth - 100, 20),
+                        ForeColor = descColor,
+                        Font      = new Font("Segoe UI", 7.5f),
+                        BackColor = Color.Transparent,
+                    };
+                    card.Controls.Add(lblCmdDesc);
+                    cy += 24;
+                }
+
+                pnlPlugins.Controls.Add(card);
+                y += cardH + 6;
+                idx++;
+            }
+
+            pnlPlugins.Height = y + 8;
         }
 
         private void LoadMicrophones()
@@ -217,6 +360,16 @@ namespace AlexaSettings
                 lblMicVolumeValue.Text = _config.MicrophoneVolume + "%";
             }
 
+            // Gemini STT / моделі
+            chkUseGeminiSTT.Checked = _config.UseGeminiSTT;
+            txtRoutingModel.Text    = _config.RoutingModel;
+            txtPluginModel.Text     = _config.PluginModel;
+
+            // Плагіни — виставляємо чекбокси (disabled = відмічений = вимкнений → знятий)
+            var disabled = _config.DisabledPlugins ?? new List<string>();
+            foreach (var kv in _pluginCheckboxes)
+                kv.Value.Checked = !disabled.Contains(kv.Key);
+
             UpdateWakeWordMode();
         }
 
@@ -263,6 +416,17 @@ namespace AlexaSettings
 
             _config.MicrophoneVolume = trackMicVolume.Value;
             SetMicVolume(trackMicVolume.Value);
+
+            // Gemini STT / моделі
+            _config.UseGeminiSTT  = chkUseGeminiSTT.Checked;
+            _config.RoutingModel  = txtRoutingModel.Text.Trim();
+            _config.PluginModel   = txtPluginModel.Text.Trim();
+
+            // Плагіни — зберігаємо список вимкнених
+            _config.DisabledPlugins = _pluginCheckboxes
+                .Where(kv => !kv.Value.Checked)
+                .Select(kv => kv.Key)
+                .ToList();
 
             try
             {
