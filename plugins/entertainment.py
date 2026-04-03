@@ -36,11 +36,8 @@ class EntertainmentPlugin(SmartPlugin):
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
         """Виконує команду плагіна."""
         try:
-            print(f"\n=== ENTERTAINMENT DEBUG ===")
-            print(f"[1] Received command: {command_name}")
-            print(f"[2] All kwargs: {kwargs}")
-
             topic = kwargs.get("value") or kwargs.get("topic", "")
+            print(f"[ENTERTAINMENT] execute: command={command_name}, topic='{topic}'")
 
             if command_name == "tell_joke":
                 return await self._generate_joke(topic)
@@ -49,10 +46,11 @@ class EntertainmentPlugin(SmartPlugin):
                 return await self._generate_fact(topic)
 
             else:
+                print(f"[ENTERTAINMENT] unknown command: {command_name}")
                 return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
-            print(f"[ERROR] Error executing {command_name} | {e}")
+            print(f"[ENTERTAINMENT] error in execute_command: {e}")
             return {"success": False, "result": None, "message": f"Помилка виконання команди: {str(e)}"}
 
     def _get_random_topic(self, is_joke: bool) -> str:
@@ -67,12 +65,13 @@ class EntertainmentPlugin(SmartPlugin):
         """Генерує новий, унікальний жарт через GPT, адаптований для TTS."""
         if not smart_ai.smart_assistant:
             joke = random.choice(self.fallback_jokes)
+            print(f"[ENTERTAINMENT] GPT unavailable, using fallback joke")
             return {"success": True, "result": {"joke": joke}, "message": "Розказую жарт", "speak_text": joke}
 
         actual_topic = topic if topic else self._get_random_topic(is_joke=True)
+        print(f"[ENTERTAINMENT] generating joke: topic='{actual_topic}'")
 
         try:
-            # ОНОВЛЕНИЙ ПРОМТ ДЛЯ ЖАРТІВ
             prompt = f"""Ти — саркастичний і трохи цинічний гік. Напиши ОДИН дуже короткий жарт або іронічне спостереження на тему: "{actual_topic}".
 
 КРИТИЧНІ ПРАВИЛА:
@@ -84,7 +83,9 @@ class EntertainmentPlugin(SmartPlugin):
 Приклад вайбу: "Купив потужну відеокарту, щоб працювати швидше... Тепер ігри завантажуються так швидко, що я не встигаю читати підказки на екрані."
 """
 
+            print(f"[ENTERTAINMENT] sending prompt to GPT (first 80 chars): '{prompt[:80].strip()}'")
             generated_joke = await self.ask_gpt(prompt, max_tokens=250, temperature=0.9)
+            print(f"[ENTERTAINMENT] GPT returned joke: '{generated_joke}'")
 
             return {
                 "success": True,
@@ -94,7 +95,7 @@ class EntertainmentPlugin(SmartPlugin):
             }
 
         except Exception as e:
-            print(f"[ERROR] Failed to generate joke: {e}")
+            print(f"[ENTERTAINMENT] GPT joke generation failed: {e}, falling back to hardcoded joke")
             joke = random.choice(self.fallback_jokes)
             return {"success": True, "result": {"joke": joke}, "message": "Розказую жарт", "speak_text": joke}
 
@@ -102,9 +103,11 @@ class EntertainmentPlugin(SmartPlugin):
         """Генерує глибокий, маловідомий факт через GPT, адаптований для TTS."""
         if not smart_ai.smart_assistant:
             fact = random.choice(self.fallback_facts)
+            print(f"[ENTERTAINMENT] GPT unavailable, using fallback fact")
             return {"success": True, "result": {"fact": fact}, "message": "Розказую факт", "speak_text": fact}
 
         actual_topic = topic if topic else self._get_random_topic(is_joke=False)
+        print(f"[ENTERTAINMENT] generating fact: topic='{actual_topic}'")
 
         try:
             prompt = f"""Ти - харизматичний ведучий науково-популярного шоу. Розкажи ОДИН вражаючий, маловідомий факт на тему: "{actual_topic}".
@@ -117,7 +120,9 @@ class EntertainmentPlugin(SmartPlugin):
 
 ФОРМАТ: Тільки текст факту з паузами."""
 
+            print(f"[ENTERTAINMENT] sending prompt to GPT (first 80 chars): '{prompt[:80].strip()}'")
             generated_fact = await self.ask_gpt(prompt, max_tokens=300, temperature=0.8)
+            print(f"[ENTERTAINMENT] GPT returned fact: '{generated_fact}'")
 
             return {
                 "success": True,
@@ -127,6 +132,6 @@ class EntertainmentPlugin(SmartPlugin):
             }
 
         except Exception as e:
-            print(f"[ERROR] Failed to generate fact: {e}")
+            print(f"[ENTERTAINMENT] GPT fact generation failed: {e}, falling back to hardcoded fact")
             fact = random.choice(self.fallback_facts)
             return {"success": True, "result": {"fact": fact}, "message": "Розказую факт", "speak_text": fact}

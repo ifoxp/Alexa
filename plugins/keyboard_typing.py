@@ -26,8 +26,7 @@ class KeyboardTypingPlugin(SmartPlugin):
 
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
         try:
-            print(f"\n=== KEYBOARD API DEBUG ===")
-            print(f"[1] Command: {command_name} | Args: {kwargs}")
+            print(f"[KEYBOARD] execute: command={command_name}, kwargs={kwargs}")
 
             command_value = kwargs.get("value")
             if command_value is None and kwargs:
@@ -35,20 +34,20 @@ class KeyboardTypingPlugin(SmartPlugin):
 
             if command_name == "type_text":
                 text_to_type = str(command_value)
-                
+
                 if not text_to_type:
+                    print(f"[KEYBOARD] no text provided")
                     return {"success": False, "result": None, "message": "Немає тексту для введення."}
 
-                # Невеличка пауза (0.2 сек), щоб переконатися, що курсор точно в полі після того, як ти закінчив говорити
-                time.sleep(0.2) 
-
-                # Функція write сама розпізнає розкладку і друкує Unicode
+                print(f"[KEYBOARD] typing ({len(text_to_type)} chars): '{text_to_type}'")
+                time.sleep(0.2)
                 keyboard.write(text_to_type, delay=0.01)
-
+                print(f"[KEYBOARD] done")
                 return {"success": True, "result": None, "message": "Текст успішно надруковано."}
 
+            print(f"[KEYBOARD] unknown command: {command_name}")
             return {"success": False, "result": None, "message": f"Невідома команда плагіна: {command_name}"}
 
         except Exception as e:
-            print(f"[ERROR] Keyboard Typing Error: {e}")
+            print(f"[KEYBOARD] error: {e}")
             return {"success": False, "result": None, "message": f"Помилка клавіатури: {str(e)}"}

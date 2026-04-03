@@ -27,20 +27,21 @@ class MovieRecommendationsPlugin(SmartPlugin):
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
         """Виконує команду плагіна."""
         try:
-            print(f"\n=== MOVIE_RECOMMENDATIONS DEBUG ===")
-            print(f"[1] Received command: {command_name}")
-            print(f"[2] All kwargs: {kwargs}")
+            print(f"[MOVIE_REC] execute: command={command_name}, kwargs={kwargs}")
 
             if command_name == "recommend_movie":
                 # Отримуємо запит, жанр або настрій
                 genre_or_mood = kwargs.get("value") or kwargs.get("genre") or kwargs.get("mood", "на твій смак")
+                print(f"[MOVIE_REC] recommend request: '{genre_or_mood}'")
                 return await self._recommend_movie(genre_or_mood)
 
             elif command_name == "search_movie":
                 movie_name = kwargs.get("value") or kwargs.get("movie", "")
+                print(f"[MOVIE_REC] direct search request: '{movie_name}'")
                 return await self._search_movie(movie_name)
 
             else:
+                print(f"[MOVIE_REC] unknown command: {command_name}")
                 return {
                     "success": False,
                     "result": None,
@@ -48,7 +49,7 @@ class MovieRecommendationsPlugin(SmartPlugin):
                 }
 
         except Exception as e:
-            print(f"[ERROR] Error executing {command_name} | {e}")
+            print(f"[MOVIE_REC] error in execute_command: {e}")
             return {
                 "success": False,
                 "result": None,
@@ -59,6 +60,7 @@ class MovieRecommendationsPlugin(SmartPlugin):
         """Запитує GPT про рекомендацію, парсить назву та відкриває пошук."""
         if not smart_ai.smart_assistant:
             # Якщо GPT відключений, просто шукаємо як звичайний текст
+            print(f"[MOVIE_REC] GPT unavailable, falling back to direct search for: '{request_text}'")
             return await self._search_movie(request_text)
 
         try:
@@ -71,8 +73,9 @@ class MovieRecommendationsPlugin(SmartPlugin):
 Назва: [Тільки точна назва фільму/серіалу/аніме українською]
 Опис: [Обов'язково напиши назву вибраного фільму/серіалу/аніме і напиши 2-3 речення про те, чому це круто і варто уваги. Без банальних фраз "Я рекомендую". Природна розповідь, що інтригує. В кінці додай "сер".]"""
 
+            print(f"[MOVIE_REC] sending prompt to GPT (first 80 chars): '{prompt[:80].strip()}'")
             gpt_reply = await self.ask_gpt(prompt, max_tokens=250, temperature=0.8)
-            print(f"[MOVIE_REC] GPT Reply:\n{gpt_reply}")
+            print(f"[MOVIE_REC] GPT raw reply:\n{gpt_reply}")
 
             # Витягуємо назву та опис із відповіді GPT
             title = ""
@@ -83,8 +86,12 @@ class MovieRecommendationsPlugin(SmartPlugin):
                 elif line.startswith("Опис:"):
                     description = line.replace("Опис:", "").strip()
 
+            print(f"[MOVIE_REC] parsed title: '{title}'")
+            print(f"[MOVIE_REC] parsed description: '{description}'")
+
             # Якщо GPT чомусь збився з формату, рятуємо ситуацію
             if not title or not description:
+                print(f"[MOVIE_REC] GPT reply did not match expected format, using fallback values")
                 title = request_text if request_text != "на твій смак" else "Щось цікаве"
                 description = gpt_reply if gpt_reply else "Ось що я знайшов, сер."
 
@@ -92,14 +99,14 @@ class MovieRecommendationsPlugin(SmartPlugin):
             return await self._search_and_open_uakino(title, description)
 
         except Exception as e:
-            print(f"[ERROR] GPT recommendation failed | {e}")
+            print(f"[MOVIE_REC] GPT recommendation failed: {e}")
             return await self._search_and_open_uakino("Цікавий фільм", "Відкриваю сторінку з фільмами, сер.")
 
     async def _search_movie(self, movie_name: str) -> Dict[str, Any]:
         """Для прямого пошуку конкретного фільму, якщо користувач вже знає, що хоче."""
         if not movie_name:
             return {"success": False, "result": None, "message": "Назва фільму не може бути пустою"}
-        
+
         description = f"Відкриваю {movie_name} для перегляду, сер."
         return await self._search_and_open_uakino(movie_name, description)
 
@@ -109,13 +116,14 @@ class MovieRecommendationsPlugin(SmartPlugin):
             # Додаємо ключові слова до назви
             search_query = f"{movie_name} дивитися на uakino"
             encoded_query = urllib.parse.quote(search_query)
-            
+
             # Шукаємо через Google (він найкраще знаходить правильне посилання на uakino, навіть якщо є помилка в назві)
             google_url = f"https://www.google.com/search?q={encoded_query}"
-            
+
             webbrowser.open(google_url)
-            print(f"[INFO] Opened uakino search for: {movie_name}")
-            
+            print(f"[MOVIE_REC] opened URL: {google_url}")
+            print(f"[MOVIE_REC] speak_text: '{speak_text}'")
+
             return {
                 "success": True,
                 "result": {
@@ -126,7 +134,7 @@ class MovieRecommendationsPlugin(SmartPlugin):
                 "speak_text": speak_text # Тут буде красива розповідь від GPT!
             }
         except Exception as e:
-            print(f"[ERROR] Failed to search movie on uakino: {movie_name} | {e}")
+            print(f"[MOVIE_REC] failed to open URL for '{movie_name}': {e}")
             return {
                 "success": False,
                 "result": None,

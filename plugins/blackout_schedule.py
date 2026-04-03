@@ -42,18 +42,20 @@ class BlackoutSchedulePlugin(SmartPlugin):
 
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
         """Виконує команду плагіна."""
-        print(f"\n=== BLACKOUT SCHEDULE DEBUG ===")
-        print(f"[1] Received command: {command_name}")
+        print(f"[BLACKOUT] execute: command={command_name}, hour={__import__('datetime').datetime.now().hour}")
 
         outages = self._read_schedule()
         
         if outages is None:
+            print(f"[BLACKOUT] schedule file missing or corrupt")
             return {
                 "success": False,
                 "result": None,
                 "message": "Файл графіка не знайдено або він пошкоджений.",
                 "speak_text": "Вибачте, сер, але я не зміг отримати доступ до файлу з графіком відключень."
             }
+
+        print(f"[BLACKOUT] loaded {len(outages)} outage hours: {outages}")
             
         # Отримуємо поточну годину (0-23)
         current_hour = datetime.now().hour
@@ -72,37 +74,41 @@ class BlackoutSchedulePlugin(SmartPlugin):
                 return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
-            print(f"[ERROR] Помилка виконання {command_name} | {e}")
+            print(f"[BLACKOUT] error in {command_name}: {e}")
             return {"success": False, "result": None, "message": f"Сталася помилка: {str(e)}"}
 
     def _when_light_on(self, current_hour: int, outages: list) -> Dict[str, Any]:
         """Шукає найближчу годину, коли світло з'явиться."""
         if current_hour not in outages:
             text = "Світло зараз є, сер. Можете не хвилюватися."
+            print(f"[BLACKOUT] when_light_on: light is ON right now")
             return {"success": True, "result": {"status": "on"}, "message": "Світло вже є", "speak_text": text}
-        
-        # Шукаємо першу годину до кінця доби, якої НЕМАЄ в списку відключень
+
         for h in range(current_hour + 1, 24):
             if h not in outages:
                 text = f"Світло увімкнуть о {h}, сер."
+                print(f"[BLACKOUT] when_light_on: next ON at {h}:00")
                 return {"success": True, "result": {"next_on": h}, "message": text, "speak_text": text}
-                
+
         text = "На жаль, світла не буде до кінця доби, сер."
+        print(f"[BLACKOUT] when_light_on: no power until end of day")
         return {"success": True, "result": {"next_on": None}, "message": text, "speak_text": text}
 
     def _when_light_off(self, current_hour: int, outages: list) -> Dict[str, Any]:
         """Шукає найближчу годину, коли світло зникне."""
         if current_hour in outages:
             text = "Світла зараз і так немає, сер."
+            print(f"[BLACKOUT] when_light_off: light is OFF right now")
             return {"success": True, "result": {"status": "off"}, "message": "Світла вже немає", "speak_text": text}
-            
-        # Шукаємо першу годину до кінця доби, яка Є в списку відключень
+
         for h in range(current_hour + 1, 24):
             if h in outages:
                 text = f"Світло вимкнуть о {h}, сер."
+                print(f"[BLACKOUT] when_light_off: next OFF at {h}:00")
                 return {"success": True, "result": {"next_off": h}, "message": text, "speak_text": text}
-                
+
         text = "Сьогодні відключень більше не планується, сер."
+        print(f"[BLACKOUT] when_light_off: no outages planned today")
         return {"success": True, "result": {"next_off": None}, "message": text, "speak_text": text}
 
     def _get_schedule(self, current_hour: int, outages: list) -> Dict[str, Any]:
@@ -138,6 +144,7 @@ class BlackoutSchedulePlugin(SmartPlugin):
         else:
             final_text = f"Графік до кінця дня. {'; '.join(schedule_parts)}. Ось так, сер."
 
+        print(f"[BLACKOUT] get_schedule: {len(schedule_parts)} blocks -> '{final_text}'")
         return {
             "success": True,
             "result": {"raw_schedule": schedule_parts},

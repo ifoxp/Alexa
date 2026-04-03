@@ -2,7 +2,7 @@ import os
 import asyncio
 import spotipy
 # 1. ЗМІНА: Імпортуємо SpotifyPKCE замість SpotifyOAuth
-from spotipy.oauth2 import SpotifyPKCE 
+from spotipy.oauth2 import SpotifyPKCE
 from typing import Dict, Any
 from .base_plugin import SmartPlugin
 
@@ -31,18 +31,41 @@ class MusicControlPlugin(SmartPlugin):
 
             scope = "user-modify-playback-state user-read-playback-state user-top-read"
             
-            # 3. ЗМІНА: Використовуємо SpotifyPKCE. Сюди передається тільки client_id.
-            auth_manager = SpotifyPKCE(
-                client_id=SPOTIFY_CLIENT_ID,
-                redirect_uri=SPOTIFY_REDIRECT_URI,
-                scope=scope,
-                cache_path=_cache_path,
-                open_browser=True
-            )
-            self.sp = spotipy.Spotify(auth_manager=auth_manager)
-            
-            current_user = self.sp.me()
-            print(f"[SPOTIFY] Успішно підключено (PKCE)! Користувач: {current_user.get('display_name')}")
+            # Виносимо логіку авторизації у внутрішню функцію для зручного перезапуску
+            def authenticate():
+                auth_manager = SpotifyPKCE(
+                    client_id=SPOTIFY_CLIENT_ID,
+                    redirect_uri=SPOTIFY_REDIRECT_URI,
+                    scope=scope,
+                    cache_path=_cache_path,
+                    open_browser=True
+                )
+                sp = spotipy.Spotify(auth_manager=auth_manager)
+                # Саме тут відбувається запит, який викликає помилку invalid_grant
+                user = sp.me() 
+                return sp, user
+
+            try:
+                # Перша спроба підключення
+                self.sp, current_user = authenticate()
+                print(f"[SPOTIFY] Успішно підключено (PKCE)! Користувач: {current_user.get('display_name')}")
+                
+            except Exception as auth_err:
+                err_str = str(auth_err).lower()
+                # Якщо помилка пов'язана з токеном (відкликаний, протермінований або пошкоджений)
+                if "invalid_grant" in err_str or "revoked" in err_str or "expired" in err_str:
+                    print("[SPOTIFY API] Старий токен недійсний. Видаляю кеш та авторизуюсь наново...")
+                    
+                    # 1. Автоматично видаляємо битий файл кешу
+                    if os.path.exists(_cache_path):
+                        os.remove(_cache_path)
+                    
+                    # 2. Робимо другу спробу (тепер браузер відкриється автоматично для нового входу)
+                    self.sp, current_user = authenticate()
+                    print(f"[SPOTIFY] Успішно підключено після оновлення токена! Користувач: {current_user.get('display_name')}")
+                else:
+                    # Якщо помилка інша (наприклад, немає інтернету), прокидаємо її далі
+                    raise auth_err
 
         except Exception as e:
             print(f"[ERROR] Помилка ініціалізації Spotify API: {e}")
@@ -55,7 +78,7 @@ class MusicControlPlugin(SmartPlugin):
     @property
     def description(self) -> str:
         return "Управління Spotify. Використовуй цей плагін, коли користувач просить увімкнути музику, пісню, плейлист, жанр або виконавця."
-    
+
     @property
     def commands(self) -> Dict[str, str]:
         # Залишили тільки найважливіше + додали рекомендації
@@ -72,29 +95,36 @@ class MusicControlPlugin(SmartPlugin):
         try:
             resp = self.sp.devices()
             devices = resp.get('devices', []) if resp else []
-            
+
             if not devices:
-                print("[SPOTIFY API] Немає пристроїв у мережі. Запускаю додаток Spotify...")
+                print("[SPOTIFY] no devices found, launching Spotify app...")
                 os.startfile("spotify:")
                 for _ in range(15):
                     await asyncio.sleep(1.0)
                     resp = self.sp.devices()
                     devices = resp.get('devices', []) if resp else []
                     if devices:
-                        print(f"[SPOTIFY API] Пристрій з'явився через {_ + 1} сек")
+                        print(f"[SPOTIFY] device appeared after {_ + 1} sec")
                         break
-                
+
             if not devices: return None
 
             for d in devices:
-                if d.get('is_active'): return d.get('id')
+                if d.get('is_active'):
+                    print(f"[SPOTIFY] using active device: id={d.get('id')}, name='{d.get('name')}', type={d.get('type')}")
+                    return d.get('id')
             for d in devices:
-                if d.get('type', '').lower() == 'computer': return d.get('id')
-            if devices: return devices[0].get('id')
+                if d.get('type', '').lower() == 'computer':
+                    print(f"[SPOTIFY] using computer device: id={d.get('id')}, name='{d.get('name')}', type={d.get('type')}")
+                    return d.get('id')
+            if devices:
+                d = devices[0]
+                print(f"[SPOTIFY] using first available device: id={d.get('id')}, name='{d.get('name')}', type={d.get('type')}")
+                return d.get('id')
             return None
-            
+
         except Exception as e:
-            print(f"[SPOTIFY API] Помилка отримання пристроїв: {e}")
+            print(f"[SPOTIFY] error getting devices: {e}")
             return None
 
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
@@ -104,8 +134,7 @@ class MusicControlPlugin(SmartPlugin):
                 return {"success": False, "result": None, "message": "Spotify API не налаштовано"}
 
         try:
-            print(f"\n=== SPOTIFY API DEBUG ===")
-            print(f"[1] Command: {command_name} | Args: {kwargs}")
+            print(f"[SPOTIFY] execute: command={command_name}, kwargs={kwargs}")
 
             # Для всіх цих 5 команд нам потрібен пристрій
             target_device_id = await self._get_target_device_id()
@@ -120,24 +149,37 @@ class MusicControlPlugin(SmartPlugin):
                 result = self.sp.search(q=query, type='track', limit=1)
                 items = result.get('tracks', {}).get('items', []) if result else []
                 if items:
-                    self.sp.start_playback(device_id=target_device_id, uris=[items[0].get('uri')])
+                    track_name = items[0].get('name')
+                    artist_name = items[0].get('artists', [{}])[0].get('name', 'Unknown')
+                    track_uri = items[0].get('uri')
+                    print(f"[SPOTIFY] play_track: found '{track_name}' by '{artist_name}', uri={track_uri}")
+                    self.sp.start_playback(device_id=target_device_id, uris=[track_uri])
                     return {"success": True, "result": None, "message": f"Вмикаю трек: {items[0].get('name')}"}
+                print(f"[SPOTIFY] play_track: no results for query='{query}'")
                 return {"success": False, "result": None, "message": f"Трек '{query}' не знайдено"}
 
             elif command_name == "play_artist":
                 result = self.sp.search(q=query, type='artist', limit=1)
                 items = result.get('artists', {}).get('items', []) if result else []
                 if items:
-                    self.sp.start_playback(device_id=target_device_id, context_uri=items[0].get('uri'))
+                    artist_name = items[0].get('name')
+                    artist_uri = items[0].get('uri')
+                    print(f"[SPOTIFY] play_artist: found '{artist_name}', uri={artist_uri}")
+                    self.sp.start_playback(device_id=target_device_id, context_uri=artist_uri)
                     return {"success": True, "result": None, "message": f"Вмикаю виконавця: {items[0].get('name')}"}
+                print(f"[SPOTIFY] play_artist: no results for query='{query}'")
                 return {"success": False, "result": None, "message": f"Виконавця '{query}' не знайдено"}
 
             elif command_name in ["play_playlist", "play_genre"]:
                 result = self.sp.search(q=query, type='playlist', limit=1)
                 items = result.get('playlists', {}).get('items', []) if result else []
                 if items:
-                    self.sp.start_playback(device_id=target_device_id, context_uri=items[0].get('uri'))
+                    playlist_name = items[0].get('name')
+                    playlist_uri = items[0].get('uri')
+                    print(f"[SPOTIFY] {command_name}: found playlist '{playlist_name}', uri={playlist_uri}")
+                    self.sp.start_playback(device_id=target_device_id, context_uri=playlist_uri)
                     return {"success": True, "result": None, "message": f"Вмикаю плейлист: {items[0].get('name')}"}
+                print(f"[SPOTIFY] {command_name}: no playlist found for query='{query}'")
                 return {"success": False, "result": None, "message": f"Плейлист '{query}' не знайдено"}
 
             elif command_name == "play_recommended":
@@ -149,28 +191,34 @@ class MusicControlPlugin(SmartPlugin):
                 if track_uris:
                     import random
                     # 2. Перемішуємо твої улюблені треки, щоб порядок завжди був різним
-                    random.shuffle(track_uris) 
-                    
+                    random.shuffle(track_uris)
+
                     # 3. Запускаємо 20 випадкових треків з твоїх улюблених
-                    self.sp.start_playback(device_id=target_device_id, uris=track_uris[:20])
+                    play_uris = track_uris[:20]
+                    print(f"[SPOTIFY] play_recommended: got {len(track_uris)} top tracks, playing {len(play_uris)} shuffled")
+                    self.sp.start_playback(device_id=target_device_id, uris=play_uris)
                     return {"success": True, "result": None, "message": "Вмикаю мікс із твоїх улюблених пісень"}
                 else:
                     # Fallback: якщо історія прослуховувань порожня, шукаємо глобальний плейлист
+                    print(f"[SPOTIFY] play_recommended: no top tracks found, falling back to Top 50 Global")
                     result = self.sp.search(q="Top 50 Global", type='playlist', limit=1)
                     items = result.get('playlists', {}).get('items', []) if result else []
                     if items:
-                        self.sp.start_playback(device_id=target_device_id, context_uri=items[0].get('uri'))
+                        playlist_name = items[0].get('name')
+                        playlist_uri = items[0].get('uri')
+                        print(f"[SPOTIFY] play_recommended fallback: using playlist '{playlist_name}', uri={playlist_uri}")
+                        self.sp.start_playback(device_id=target_device_id, context_uri=playlist_uri)
                         return {"success": True, "result": None, "message": "Вмикаю популярні хіти"}
 
                 return {"success": False, "result": None, "message": "Не вдалося згенерувати плейлист"}
 
         except spotipy.exceptions.SpotifyException as e:
-            print(f"\n[🔴 CRITICAL SPOTIFY ERROR] Код: {e.http_status}, Повідомлення: {e.msg}")
+            print(f"[SPOTIFY] SpotifyException: http_status={e.http_status}, msg={e.msg}")
             if e.http_status == 403 or "PREMIUM_REQUIRED" in str(e):
                  return {"success": False, "result": None, "message": "Для керування відтворенням потрібен Spotify Premium"}
             return {"success": False, "result": None, "message": f"Помилка доступу до Spotify: {e.msg}"}
         except Exception as e:
-            print(f"\n[🔴 UNEXPECTED ERROR] {str(e)}")
+            print(f"[SPOTIFY] unexpected error: {e}")
             return {"success": False, "result": None, "message": f"Внутрішня помилка: {str(e)}"}
 
         return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}

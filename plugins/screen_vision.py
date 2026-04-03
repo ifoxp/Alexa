@@ -77,23 +77,22 @@ class ScreenVisionPlugin(SmartPlugin):
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
         """Виконує команду плагіна."""
         try:
-            print(f"\n=== [SCREEN_VISION] ЗАПУСК ===")
-            print(f"[1] received command: {command_name}")
+            print(f"[VISION] execute: command={command_name}, kwargs={kwargs}")
 
             if command_name == "analyze_screen":
                 user_request = kwargs.get("value", "опиши, що ти бачиш")
-                
-                # ⚠️ ЗМІНА 3: Запускаємо блокуючу логіку MSS/PyAutoGUI в окремому потоці,
-                # щоб не вішати ядро асистента і уникнути крашу MSS на Windows.
+                print(f"[VISION] user_request: '{user_request}'")
+
                 screenshot_path = "temp_screenshot.png"
-                print(f"[2] Запускаю створення скріншота в окремому потоці...")
-                
+                print(f"[VISION] taking screenshot in thread...")
+
                 success, details = await asyncio.to_thread(self._take_screenshot_blocking, screenshot_path)
-                
+
                 if not success or not os.path.exists(screenshot_path):
+                    print(f"[VISION] screenshot failed: {details}")
                     return {"success": False, "message": f"Помилка створення скріншота: {details}"}
-                
-                print(f"[3] {details}")
+
+                print(f"[VISION] {details}")
 
                 # 2. Відправляємо запит до Gemini Vision
                 if not smart_ai.smart_assistant:
@@ -115,7 +114,7 @@ class ScreenVisionPlugin(SmartPlugin):
 
                 combined_prompt = f"{visual_instruction}\n\nЗАПИТ КОРИСТУВАЧА: {user_request}"
                 
-                print(f"[4] Відправляю запит до Gemini Vision з промтом: '{user_request}'")
+                print(f"[VISION] sending to Gemini Vision: '{user_request}'")
 
                 try:
                     with open(screenshot_path, 'rb') as f:
@@ -143,11 +142,10 @@ class ScreenVisionPlugin(SmartPlugin):
                     # Видаляємо тимчасовий скріншот у будь-якому випадку
                     if os.path.exists(screenshot_path):
                         os.remove(screenshot_path)
-                        print(f"[5] Тимчасовий скріншот видалено")
+                        print(f"[VISION] temp screenshot deleted")
 
-                # 3. Обробляємо JSON-відповідь
                 final_response_text = response.text.strip()
-                print(f"[6] Отримано відповідь від Gemini: {final_response_text}")
+                print(f"[VISION] Gemini response: {final_response_text}")
 
                 try:
                     data = json.loads(final_response_text)
@@ -158,10 +156,10 @@ class ScreenVisionPlugin(SmartPlugin):
                     plugin_message_suffix = ""
                     if clipboard_text:
                         pyperclip.copy(clipboard_text)
-                        print(f"[7] Текст скопійовано в буфер: {clipboard_text[:50]}...")
+                        print(f"[VISION] copied to clipboard: '{clipboard_text[:80]}'")
                         plugin_message_suffix = " (Текст скопійовано в буфер)."
 
-                    print(f"=== [SCREEN_VISION] ЗАВЕРШЕНО УСПІШНО ===\n")
+                    print(f"[VISION] speak_text: '{speak_text}'")
 
                     return {
                         "success": True,
@@ -171,7 +169,7 @@ class ScreenVisionPlugin(SmartPlugin):
                     }
 
                 except json.JSONDecodeError:
-                    print(f"[ERROR] Не вдалося розпарсити JSON від Gemini: {final_response_text}")
+                    print(f"[VISION] failed to parse JSON from Gemini: {final_response_text[:200]}")
                     return {"success": False, "message": "Помилка формату візуальних даних від API."}
 
             else:

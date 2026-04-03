@@ -35,7 +35,8 @@ class SystemControlPlugin(SmartPlugin):
         try:
             # Отримання значення (універсальне)
             raw_value = kwargs.get("value") or kwargs.get("level") or kwargs.get("step")
-            
+            print(f"[SOUND] execute: command={command_name}, raw_value='{raw_value}'")
+
             # Базовий парсинг числа (якщо прийшло просто число)
             value_int = 0
             if raw_value:
@@ -46,16 +47,16 @@ class SystemControlPlugin(SmartPlugin):
 
             if command_name == "set_volume":
                 return await self._set_volume(value_int if value_int else 50)
-            
+
             elif command_name == "volume_up":
                 return await self._volume_up(value_int if value_int else 10)
-            
+
             elif command_name == "volume_down":
                 return await self._volume_down(value_int if value_int else 10)
-            
+
             elif command_name == "mute_toggle":
                 return await self._mute_toggle()
-            
+
             elif command_name == "set_active_app_volume":
                 return await self._set_active_app_volume(value_int)
 
@@ -73,6 +74,7 @@ class SystemControlPlugin(SmartPlugin):
                     return {"success": False, "message": "Для цієї команди потрібна назва програми"}
 
             else:
+                print(f"[SOUND] unknown command: {command_name}")
                 return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
@@ -87,8 +89,10 @@ class SystemControlPlugin(SmartPlugin):
             interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
             volume = cast(interface, POINTER(IAudioEndpointVolume))
             volume.SetMasterVolumeLevelScalar(level / 100.0, None)
+            print(f"[SOUND] set_volume: system volume set to {level}%")
             return {"success": True, "result": {"volume_level": level}, "message": f"Встановлено загальну гучність на {level}%"}
         except Exception as e:
+            print(f"[SOUND] set_volume failed: {e}")
             return {"success": False, "result": None, "message": f"Помилка: {str(e)}"}
 
     async def _volume_up(self, step: int) -> Dict[str, Any]:
@@ -99,8 +103,10 @@ class SystemControlPlugin(SmartPlugin):
             current_level = volume.GetMasterVolumeLevelScalar() * 100
             new_level = min(100, current_level + step)
             volume.SetMasterVolumeLevelScalar(new_level / 100.0, None)
+            print(f"[SOUND] volume_up: {current_level:.0f}% -> {new_level:.0f}% (step={step})")
             return {"success": True, "result": {"level": new_level}, "message": f"Гучність збільшено до {new_level:.0f}%"}
-        except Exception:
+        except Exception as e:
+            print(f"[SOUND] volume_up failed: {e}")
             return {"success": False, "message": "Помилка зміни гучності"}
 
     async def _volume_down(self, step: int) -> Dict[str, Any]:
@@ -111,8 +117,10 @@ class SystemControlPlugin(SmartPlugin):
             current_level = volume.GetMasterVolumeLevelScalar() * 100
             new_level = max(0, current_level - step)
             volume.SetMasterVolumeLevelScalar(new_level / 100.0, None)
+            print(f"[SOUND] volume_down: {current_level:.0f}% -> {new_level:.0f}% (step={step})")
             return {"success": True, "result": {"level": new_level}, "message": f"Гучність зменшено до {new_level:.0f}%"}
-        except Exception:
+        except Exception as e:
+            print(f"[SOUND] volume_down failed: {e}")
             return {"success": False, "message": "Помилка зміни гучності"}
 
     async def _mute_toggle(self) -> Dict[str, Any]:
@@ -123,8 +131,10 @@ class SystemControlPlugin(SmartPlugin):
             is_muted = volume.GetMute()
             volume.SetMute(not is_muted, None)
             state = "увімкнено" if is_muted else "вимкнено"
+            print(f"[SOUND] mute_toggle: was_muted={is_muted}, now sound is {state}")
             return {"success": True, "result": {"muted": not is_muted}, "message": f"Звук {state}"}
         except Exception as e:
+            print(f"[SOUND] mute_toggle failed: {e}")
             return {"success": False, "message": f"Помилка: {e}"}
 
     # --- Advanced App Control Methods ---
@@ -137,7 +147,7 @@ class SystemControlPlugin(SmartPlugin):
             hwnd = win32gui.GetForegroundWindow()
             _, active_pid = win32process.GetWindowThreadProcessId(hwnd)
             window_title = win32gui.GetWindowText(hwnd) or "Unknown Window"
-            
+
             # Отримуємо ім'я процесу активного вікна
             active_exe_name = ""
             try:
@@ -145,9 +155,10 @@ class SystemControlPlugin(SmartPlugin):
             except: pass
 
             level = max(0, min(100, int(level)))
+            print(f"[SOUND] set_active_app_volume: target='{window_title}' (pid={active_pid}, exe='{active_exe_name}'), level={level}%")
             sessions = AudioUtilities.GetAllSessions()
             app_found = False
-            
+
             for session in sessions:
                 if not session or session.ProcessId == 0: continue
                 try:
@@ -160,13 +171,16 @@ class SystemControlPlugin(SmartPlugin):
                         volume.SetMasterVolume(level / 100.0, None)
                         app_found = True
                 except: continue
-            
+
             if app_found:
+                print(f"[SOUND] set_active_app_volume: success, '{window_title}' set to {level}%")
                 return {"success": True, "message": f"Гучність '{window_title}' встановлено на {level}%"}
             else:
+                print(f"[SOUND] set_active_app_volume: no audio session found for '{window_title}'")
                 return {"success": False, "message": f"Не знайдено аудіо для '{window_title}'"}
 
         except Exception as e:
+            print(f"[SOUND] set_active_app_volume failed: {e}")
             return {"success": False, "message": f"Помилка: {str(e)}"}
 
     async def _set_specific_app_volume_by_text(self, text: str) -> Dict[str, Any]:
@@ -187,9 +201,9 @@ class SystemControlPlugin(SmartPlugin):
             else:
                 # Якщо числа немає, беремо весь текст як назву
                 app_query = text.lower()
-            
+
             level = max(0, min(100, level))
-            
+
             print(f"[DEBUG] Search Query: '{app_query}', Target Level: {level}")
 
             # 2. Отримуємо список всіх програм зі звуком
@@ -202,7 +216,7 @@ class SystemControlPlugin(SmartPlugin):
                     proc = psutil.Process(session.ProcessId)
                     exe_name = proc.name().lower() # spotify.exe
                     simple_name = exe_name.replace(".exe", "") # spotify
-                    
+
                     if simple_name not in audio_apps:
                         audio_apps[simple_name] = []
                     audio_apps[simple_name].append(session)
@@ -216,7 +230,7 @@ class SystemControlPlugin(SmartPlugin):
             matches = difflib.get_close_matches(app_query, available_apps, n=1, cutoff=0.4)
 
             target_app_name = None
-            
+
             # Спеціальні перевірки для популярних скорочень
             if not matches:
                 if "chrome" in app_query and "chrome" in available_apps: target_app_name = "chrome"
@@ -224,7 +238,7 @@ class SystemControlPlugin(SmartPlugin):
                 elif "steam" in app_query:
                     # Steam часто має процеси типу steamwebhelper
                     for app in available_apps:
-                        if "steam" in app: 
+                        if "steam" in app:
                             target_app_name = app
                             break
             else:
@@ -232,20 +246,20 @@ class SystemControlPlugin(SmartPlugin):
 
             if target_app_name:
                 print(f"[DEBUG] Match found: '{app_query}' -> '{target_app_name}'")
-                
+
                 # Застосовуємо гучність до всіх сесій цієї програми
                 target_sessions = audio_apps[target_app_name]
                 for session in target_sessions:
                     volume = session._ctl.QueryInterface(ISimpleAudioVolume)
                     volume.SetMasterVolume(level / 100.0, None)
-                
+
                 return {
-                    "success": True, 
+                    "success": True,
                     "message": f"Гучність для '{target_app_name}' встановлено на {level}%"
                 }
             else:
                 return {
-                    "success": False, 
+                    "success": False,
                     "message": f"Програму '{app_query}' не знайдено серед активних аудіо джерел. Доступні: {', '.join(available_apps[:5])}..."
                 }
 

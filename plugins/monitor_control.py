@@ -43,18 +43,12 @@ class MonitorControlPlugin(SmartPlugin):
 
     async def execute_command(self, command_name: str, **kwargs) -> Dict[str, Any]:
         try:
-            print(f"\n" + "="*40)
-            print(f"=== [MONITOR API DEBUG START] ===")
-            print(f"[1] Отримано команду: '{command_name}'")
-            print(f"[2] Сирі аргументи від ШІ: {kwargs}")
-
-            # Витягуємо поля
             value_field = kwargs.get("value")
             level_field = kwargs.get("level")
-            print(f"[3] Розбір полів -> value: '{value_field}', level: '{level_field}'")
+            print(f"[MONITOR] execute: command={command_name}, value='{value_field}', level='{level_field}'")
 
             available_monitors = sbc.list_monitors()
-            print(f"[4] Знайдено моніторів у системі: {len(available_monitors)} {available_monitors}")
+            print(f"[MONITOR] monitors found: {len(available_monitors)} {available_monitors}")
 
             # ==========================================
             # КОМАНДИ: ЖИВЛЕННЯ (УВІМКНЕННЯ / ВИМКНЕННЯ)
@@ -63,11 +57,10 @@ class MonitorControlPlugin(SmartPlugin):
                 # Беремо номер монітора з value, а якщо там пусто — беремо з level
                 raw_monitor_id = value_field if value_field else level_field
                 monitor_id = str(raw_monitor_id).strip()
-                
-                print(f"[5] Зрозуміли ID монітора для живлення: '{monitor_id}'")
+                print(f"[MONITOR] power command: monitor_id='{monitor_id}', action={command_name}")
 
                 tool_path = self._get_tool_path()
-                print(f"[6] Шлях до MultiMonitorTool.exe: '{tool_path}'")
+                print(f"[MONITOR] tool path: '{tool_path}'")
                 
                 if not os.path.exists(tool_path):
                     print(f"[ERROR] Файл не знайдено за шляхом: {tool_path}")
@@ -77,19 +70,15 @@ class MonitorControlPlugin(SmartPlugin):
                 # Тепер монітор просто "засинає", зберігаючи свою вертикальну орієнтацію!
                 action = "/TurnOff" if command_name == "turn_off_monitor" else "/TurnOn"
                 cmd_list = [tool_path, action, monitor_id]
-                print(f"[7] Сформована команда для терміналу: {cmd_list}")
+                print(f"[MONITOR] running: {cmd_list}")
 
                 try:
-                    # Запускаємо процес і перехоплюємо його вивід для логів
-                    result = subprocess.run(cmd_list, check=True, capture_output=True, text=True)
-                    print(f"[8] Процес успішний! Вивід (STDOUT): {result.stdout}")
+                    subprocess.run(cmd_list, check=True, capture_output=True, text=True)
                     status_msg = "вимкнено" if command_name == "turn_off_monitor" else "увімкнено"
-                    print("=== [MONITOR API DEBUG END] ===\n")
+                    print(f"[MONITOR] monitor {monitor_id} {status_msg}")
                     return {"success": True, "result": None, "message": f"Монітор {monitor_id} {status_msg}"}
                 except subprocess.CalledProcessError as e:
-                    print(f"[ERROR] Команда впала з кодом {e.returncode}")
-                    print(f"[ERROR] Вивід помилки (STDERR): {e.stderr}")
-                    print("=== [MONITOR API DEBUG END] ===\n")
+                    print(f"[MONITOR] command failed (rc={e.returncode}): {e.stderr}")
                     return {"success": False, "result": None, "message": f"Не вдалося змінити стан монітора: {e}"}
 
             # ==========================================
@@ -109,20 +98,18 @@ class MonitorControlPlugin(SmartPlugin):
                 elif level_field:
                     command_value = level_field
 
-                print(f"[5] Сире значення для яскравості: {command_value}")
+                print(f"[MONITOR] set_brightness raw value: {command_value}")
 
-                # Намагаємося розпарсити рядок у список
                 if isinstance(command_value, str):
                     try:
-                        # Заміна одинарних лапок на подвійні для безпечного JSON парсингу
                         command_value = json.loads(command_value.replace("'", '"'))
                     except (json.JSONDecodeError, ValueError):
                         pass
 
-                print(f"[6] Фінальне значення для яскравості: {command_value} (Тип: {type(command_value)})")
+                print(f"[MONITOR] set_brightness parsed: {command_value} (type={type(command_value).__name__})")
 
                 if not isinstance(command_value, list):
-                    print(f"[ERROR] Очікувався масив, а отримали {type(command_value)}")
+                    print(f"[MONITOR] expected list, got {type(command_value).__name__}")
                     return {"success": False, "result": None, "message": "Неправильний формат параметрів. Очікувався масив."}
 
                 # СЦЕНАРІЙ 1: Масив масивів (кілька моніторів з різною яскравістю)
@@ -136,17 +123,17 @@ class MonitorControlPlugin(SmartPlugin):
                             if disp_idx < 0 or disp_idx >= len(available_monitors):
                                 continue
                             try:
-                                print(f"[7] Встановлюю яскравість {lvl}% для дисплея [{disp_idx}] (VCP)")
+                                print(f"[MONITOR] set brightness monitor {mon_id} (idx={disp_idx}) -> {lvl}%")
                                 sbc.set_brightness(lvl, display=disp_idx, method='vcp')
                                 success_msgs.append(f"М{mon_id}: {lvl}%")
                             except Exception as e:
-                                print(f"[MONITOR API] VCP помилка: {e}")
+                                print(f"[MONITOR] VCP failed for monitor {mon_id}: {e}, trying fallback")
                                 try:
                                     sbc.set_brightness(lvl, display=disp_idx)
                                     success_msgs.append(f"М{mon_id}: {lvl}% (резерв)")
                                 except Exception:
                                     pass
-                    print("=== [MONITOR API DEBUG END] ===\n")
+                    print(f"[MONITOR] multi-monitor brightness done: {success_msgs}")
                     return {"success": True, "result": None, "message": f"Оновлено яскравість: {', '.join(success_msgs)}"}
 
                 # СЦЕНАРІЙ 2: Одинарний масив (один монітор або всі)
@@ -155,37 +142,34 @@ class MonitorControlPlugin(SmartPlugin):
                     level = int(command_value[1])
 
                     if str(monitor_id).lower() == "all":
-                        print(f"[7] Встановлюю яскравість {level}% для ВСІХ дисплеїв")
+                        print(f"[MONITOR] set brightness ALL monitors -> {level}%")
                         for i in range(len(available_monitors)):
                             try:
                                 sbc.set_brightness(level, display=i, method='vcp')
-                            except Exception as e:
+                            except Exception:
                                 sbc.set_brightness(level, display=i)
-                        print("=== [MONITOR API DEBUG END] ===\n")
                         return {"success": True, "result": None, "message": f"Яскравість всіх дисплеїв встановлено на {level}%"}
-                    
+
                     else:
-                        display_index = int(monitor_id) - 1 
+                        display_index = int(monitor_id) - 1
                         if display_index < 0 or display_index >= len(available_monitors):
-                             print(f"[ERROR] Монітор {monitor_id} не знайдено (є тільки {len(available_monitors)})")
-                             return {"success": False, "result": None, "message": f"Монітор з номером {monitor_id} не знайдено."}
+                            print(f"[MONITOR] monitor {monitor_id} not found (total={len(available_monitors)})")
+                            return {"success": False, "result": None, "message": f"Монітор з номером {monitor_id} не знайдено."}
 
                         try:
-                            print(f"[7] Встановлюю яскравість {level}% для дисплея [{display_index}]")
+                            print(f"[MONITOR] set brightness monitor {monitor_id} (idx={display_index}) -> {level}%")
                             sbc.set_brightness(level, display=display_index, method='vcp')
-                            print("=== [MONITOR API DEBUG END] ===\n")
                             return {"success": True, "result": None, "message": f"Яскравість монітора {monitor_id} встановлено на {level}%"}
                         except Exception as fallback_error:
-                            print(f"[MONITOR API] VCP помилка, пробую WMI: {fallback_error}")
+                            print(f"[MONITOR] VCP failed: {fallback_error}, trying fallback")
                             sbc.set_brightness(level, display=display_index)
-                            print("=== [MONITOR API DEBUG END] ===\n")
                             return {"success": True, "result": None, "message": f"Яскравість монітора {monitor_id} встановлено (резерв)."}
 
-            print("[ERROR] Невідома команда плагіна")
+            print(f"[MONITOR] unknown command: {command_name}")
             return {"success": False, "result": None, "message": f"Невідома команда: {command_name}"}
 
         except Exception as e:
-            print(f"[CRITICAL ERROR] Monitor Control Error: {e}")
+            print(f"[MONITOR] critical error: {e}")
             import traceback
             traceback.print_exc()
             return {"success": False, "result": None, "message": f"Внутрішня помилка: {str(e)}"}
