@@ -13,6 +13,7 @@ from logger_config import get_logger
 from audio_buffer import BufferedAudioStream
 from memory_manager import memory_manager, ResourceManager, log_memory_usage
 import smart_ai
+from media_controller import media_manager
 
 logger = get_logger('main')
 
@@ -312,6 +313,9 @@ def main():
             )
             listen_thread.start()
 
+            # Запускаємо watchdog відновлення гучності
+            media_manager.start_watchdog()
+
             logger.info("Assistant started successfully")
             tray.start()
 
@@ -330,6 +334,7 @@ def main():
                     porcupine.delete()
                 except Exception:
                     pass
+            media_manager.stop_watchdog()
             logger.info("Program terminated successfully")
 
 if __name__ == "__main__":

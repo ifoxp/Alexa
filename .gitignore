@@ -233,6 +233,7 @@ commands_log.txt
 logs/
 
 .spotify_cache
+audio_state.json
 
 .calendar_tokens/
 calendar_tokens/

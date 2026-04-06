@@ -1,8 +1,54 @@
 import os
+import json
 import asyncio
+import threading
 import psutil
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
 from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager
+
+# Гучності під час duck (програмні, не користувацькі)
+DUCK_VOL_DEFAULT = 0.07
+DUCK_VOL_DISCORD = 0.32
+
+# Файл зі збереженими оригінальними гучностями
+_STATE_FILE = "audio_state.json"
+
+def _get_state_path() -> str:
+    """Шлях до audio_state.json поряд з виконуваним файлом або скриптом."""
+    base = getattr(__import__('sys'), 'frozen', False) and os.path.dirname(__import__('sys').executable) or os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, _STATE_FILE)
+
+
+def _load_state() -> dict:
+    """Завантажує збережені оригінальні гучності з файлу."""
+    path = _get_state_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_state(state: dict):
+    """Зберігає оригінальні гучності у файл."""
+    path = _get_state_path()
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(state, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"[MEDIA] Помилка збереження стану: {e}")
+
+
+def _clear_state():
+    """Очищає файл стану після успішного відновлення."""
+    path = _get_state_path()
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
 
 
 class MediaStateManager:
@@ -10,9 +56,12 @@ class MediaStateManager:
 
     def __init__(self):
         self.was_paused_by_assistant = False
-        # Збережені гучності: {pid: (volume, session)}
+        # Збережені гучності в пам'яті: {pid: (volume, vol_ctrl)}
         self._saved_volumes: dict = {}
         self._own_pid = os.getpid()
+        # Watchdog
+        self._watchdog_thread: threading.Thread | None = None
+        self._watchdog_stop = threading.Event()
 
     # ─── Windows Media API (пауза відео/медіа) ────────────────────────────────
 
@@ -53,20 +102,20 @@ class MediaStateManager:
                 print("[MEDIA] Відновлення не потрібне.")
         self.was_paused_by_assistant = False
 
-    # ─── pycaw (мют усіх аудіо-сесій крім себе) ──────────────────────────────
+    # ─── pycaw (duck/restore гучності) ──────────────────────────────────────
 
     def _mute_all_except_self(self):
-        """Зберігає поточні гучності і мютить всі сесії крім власного процесу."""
+        """Зберігає поточні гучності (в пам'ять + файл) і знижує всі сесії крім себе."""
         self._saved_volumes.clear()
+        file_state: dict = {}
+
         try:
             sessions = AudioUtilities.GetAllSessions()
             for session in sessions:
                 if not session or session.ProcessId == 0:
                     continue
-                # Пропускаємо власний процес і всіх його нащадків
                 try:
                     proc = psutil.Process(session.ProcessId)
-                    # Перевіряємо чи це ми самі або наш нащадок
                     if session.ProcessId == self._own_pid:
                         continue
                     try:
@@ -81,13 +130,21 @@ class MediaStateManager:
                     vol_ctrl = session._ctl.QueryInterface(ISimpleAudioVolume)
                     current_vol = vol_ctrl.GetMasterVolume()
                     if current_vol > 0:
-                        self._saved_volumes[session.ProcessId] = (current_vol, vol_ctrl)
-                        # Discord — знижуємо до 30%, решта — до 7%
                         try:
                             proc_name = psutil.Process(session.ProcessId).name().lower()
                         except Exception:
                             proc_name = ""
-                        target_vol = 0.30 if "discord" in proc_name else 0.07
+
+                        # Зберігаємо лише якщо це не вже задакована гучність
+                        is_duck_vol = abs(current_vol - DUCK_VOL_DISCORD) < 0.01 or abs(current_vol - DUCK_VOL_DEFAULT) < 0.01
+                        if not is_duck_vol:
+                            self._saved_volumes[session.ProcessId] = (current_vol, vol_ctrl)
+                            file_state[str(session.ProcessId)] = {
+                                "name": proc_name,
+                                "volume": current_vol,
+                            }
+
+                        target_vol = DUCK_VOL_DISCORD if "discord" in proc_name else DUCK_VOL_DEFAULT
                         vol_ctrl.SetMasterVolume(target_vol, None)
                 except Exception:
                     continue
@@ -100,12 +157,16 @@ class MediaStateManager:
                     except Exception:
                         names.append(str(pid))
                 print(f"[MEDIA] Мютую: {', '.join(names)}")
+                _save_state(file_state)
+
         except Exception as e:
             print(f"[MEDIA] Помилка мютування: {e}")
 
     def _restore_all_volumes(self):
-        """Відновлює збережені гучності."""
+        """Відновлює збережені гучності з пам'яті."""
         if not self._saved_volumes:
+            # Спробуємо з файлу (на випадок краш-відновлення)
+            self._restore_from_file()
             return
         restored = []
         for pid, (vol, vol_ctrl) in self._saved_volumes.items():
@@ -120,6 +181,116 @@ class MediaStateManager:
         if restored:
             print(f"[MEDIA] Відновлюю гучність: {', '.join(restored)}")
         self._saved_volumes.clear()
+        _clear_state()
+
+    def _restore_from_file(self):
+        """Відновлює гучності з файлу (watchdog або краш-відновлення)."""
+        state = _load_state()
+        if not state:
+            return
+
+        restored = []
+        try:
+            sessions = AudioUtilities.GetAllSessions()
+            session_map = {}
+            for session in sessions:
+                if session and session.ProcessId != 0:
+                    session_map[session.ProcessId] = session
+
+            for pid_str, info in state.items():
+                try:
+                    pid = int(pid_str)
+                    target_vol = info.get("volume", 1.0)
+                    proc_name = info.get("name", "")
+
+                    if pid in session_map:
+                        vol_ctrl = session_map[pid]._ctl.QueryInterface(ISimpleAudioVolume)
+                        vol_ctrl.SetMasterVolume(target_vol, None)
+                        restored.append(proc_name or str(pid))
+                    else:
+                        # Процес може мати новий PID — шукаємо по назві
+                        for session in sessions:
+                            if not session or session.ProcessId == 0:
+                                continue
+                            try:
+                                name = psutil.Process(session.ProcessId).name().lower()
+                                if name == proc_name.lower():
+                                    vol_ctrl = session._ctl.QueryInterface(ISimpleAudioVolume)
+                                    vol_ctrl.SetMasterVolume(target_vol, None)
+                                    restored.append(proc_name)
+                                    break
+                            except Exception:
+                                continue
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"[MEDIA] Помилка відновлення з файлу: {e}")
+
+        if restored:
+            print(f"[MEDIA] Watchdog відновив гучність: {', '.join(restored)}")
+        _clear_state()
+
+    # ─── Watchdog ─────────────────────────────────────────────────────────────
+
+    def _watchdog_loop(self):
+        """Раз на хвилину перевіряє чи не застрягли програми на duck-гучності."""
+        while not self._watchdog_stop.wait(60):
+            state = _load_state()
+            if not state:
+                continue  # Нічого не збережено — все добре
+
+            # Перевіряємо чи є хоч один процес що застряг на duck-рівні
+            found_stuck = False
+            try:
+                sessions = AudioUtilities.GetAllSessions()
+                for session in sessions:
+                    if not session or session.ProcessId == 0:
+                        continue
+                    pid_str = str(session.ProcessId)
+                    if pid_str not in state:
+                        # Шукаємо по назві
+                        try:
+                            name = psutil.Process(session.ProcessId).name().lower()
+                            for saved_pid, info in state.items():
+                                if info.get("name", "").lower() == name:
+                                    pid_str = saved_pid
+                                    break
+                            else:
+                                continue
+                        except Exception:
+                            continue
+                    try:
+                        vol_ctrl = session._ctl.QueryInterface(ISimpleAudioVolume)
+                        current = vol_ctrl.GetMasterVolume()
+                        is_stuck = abs(current - DUCK_VOL_DEFAULT) < 0.01 or abs(current - DUCK_VOL_DISCORD) < 0.01
+                        if is_stuck:
+                            found_stuck = True
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
+            if found_stuck:
+                print("[MEDIA] Watchdog: знайдено застряглу гучність, відновлюю...")
+                self._restore_from_file()
+
+    def start_watchdog(self):
+        """Запускає фоновий watchdog-потік."""
+        if self._watchdog_thread and self._watchdog_thread.is_alive():
+            return
+        self._watchdog_stop.clear()
+        self._watchdog_thread = threading.Thread(
+            target=self._watchdog_loop,
+            name="AudioWatchdog",
+            daemon=True,
+        )
+        self._watchdog_thread.start()
+        print("[MEDIA] Watchdog запущено.")
+
+    def stop_watchdog(self):
+        """Зупиняє watchdog."""
+        self._watchdog_stop.set()
 
     # ─── Публічні синхронні методи ────────────────────────────────────────────
 
