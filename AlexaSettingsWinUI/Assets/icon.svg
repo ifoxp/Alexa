@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#0f0f1a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#818cf8"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6" stop-opacity="0.8"/>
+      <stop offset="100%" style="stop-color:#6366f1" stop-opacity="0.3"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Фон -->
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+
+  <!-- Зовнішнє кільце -->
+  <circle cx="128" cy="128" r="96" fill="none" stroke="url(#ring)" stroke-width="2" opacity="0.6"/>
+
+  <!-- Внутрішнє кільце -->
+  <circle cx="128" cy="128" r="72" fill="none" stroke="url(#accent)" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Звукові хвилі ліворуч -->
+  <path d="M 62 100 Q 50 128 62 156" fill="none" stroke="url(#accent)" stroke-width="4" stroke-linecap="round" opacity="0.7" filter="url(#glow)"/>
+  <path d="M 76 88 Q 58 128 76 168" fill="none" stroke="url(#accent)" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Звукові хвилі праворуч -->
+  <path d="M 194 100 Q 206 128 194 156" fill="none" stroke="url(#accent)" stroke-width="4" stroke-linecap="round" opacity="0.7" filter="url(#glow)"/>
+  <path d="M 180 88 Q 198 128 180 168" fill="none" stroke="url(#accent)" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Мікрофон — тіло -->
+  <rect x="108" y="72" width="40" height="64" rx="20" fill="url(#accent)" filter="url(#glow)"/>
+
+  <!-- Мікрофон — підставка -->
+  <path d="M 88 148 Q 88 192 128 192 Q 168 192 168 148" fill="none" stroke="url(#accent)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="128" y1="192" x2="128" y2="210" stroke="url(#accent)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="108" y1="210" x2="148" y2="210" stroke="url(#accent)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Внутрішня деталь мікрофона -->
+  <rect x="118" y="82" width="20" height="44" rx="10" fill="#1a1a2e" opacity="0.5"/>
+</svg>

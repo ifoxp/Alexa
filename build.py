@@ -23,8 +23,8 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
 # ─── Налаштування ─────────────────────────────────────────────────────────────
 EXE_NAME        = "Alexa"
 MAIN_SCRIPT     = "main.py"
-CSHARP_DIR      = Path(__file__).resolve().parent / "AlexaSettings"
-CSHARP_EXE_NAME = "AlexaSettings.exe"
+CSHARP_DIR      = Path(__file__).resolve().parent / "AlexaSettingsWinUI"
+CSHARP_EXE_NAME = "AlexaSettingsWinUI.exe"
 
 BASE_DIR   = Path(__file__).resolve().parent
 DIST_DIR   = BASE_DIR / "dist" / EXE_NAME
@@ -165,11 +165,11 @@ def build_python() -> bool:
     return True
 
 
-# ─── Крок 2: Збірка C# (dotnet publish) ───────────────────────────────────────
+# ─── Крок 2: Збірка C# WinUI 3 (dotnet publish) ──────────────────────────────
 def build_csharp() -> bool:
-    step(2, 4, "Збірка C# AlexaSettings → dotnet publish")
+    step(2, 4, "Збірка C# AlexaSettingsWinUI → dotnet publish")
 
-    csproj = CSHARP_DIR / "AlexaSettings.csproj"
+    csproj = CSHARP_DIR / "AlexaSettingsWinUI.csproj"
     if not csproj.exists():
         print(f"  [ПОМИЛКА] .csproj не знайдено: {csproj}")
         return False
@@ -180,33 +180,42 @@ def build_csharp() -> bool:
         'dotnet', 'publish', str(csproj),
         '-c', 'Release',
         '-r', 'win-x64',
-        '--self-contained', 'false',
+        '--self-contained', 'true',       # WinUI 3 потребує self-contained або встановленого WAS
         f'-o', str(publish_dir),
-        '/p:PublishSingleFile=true',
-        '/p:IncludeNativeLibrariesForSelfExtract=true',
+        '/p:PublishSingleFile=false',     # WinUI 3 не підтримує SingleFile через нативні бібліотеки
     ]
 
     print("  Запуск dotnet publish...")
     proc = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
     if proc.returncode != 0:
         print(f"  [ПОМИЛКА] dotnet publish завершився з кодом {proc.returncode}")
-        print(proc.stderr[-2000:] if proc.stderr else "")
+        if proc.stdout: print(proc.stdout[-3000:])
+        if proc.stderr: print(proc.stderr[-3000:])
         return False
 
-    # Копіюємо AlexaSettings.exe в dist/Alexa/
-    src_exe = publish_dir / CSHARP_EXE_NAME
-    if not src_exe.exists():
-        # dotnet може назвати по-різному
-        exes = list(publish_dir.glob("*.exe"))
-        src_exe = exes[0] if exes else None
-
-    if not src_exe or not src_exe.exists():
-        print(f"  [ПОМИЛКА] {CSHARP_EXE_NAME} не знайдено в {publish_dir}")
-        return False
-
+    # WinUI 3 не підтримує SingleFile — копіюємо всі файли прямо в dist/Alexa/
+    # (dll не конфліктують з Python dll, вони мають унікальні імена Microsoft.*)
     DIST_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src_exe, DIST_DIR / CSHARP_EXE_NAME)
-    print(f"  [OK] {CSHARP_EXE_NAME} скопійовано в dist/{EXE_NAME}/")
+    for item in publish_dir.iterdir():
+        dst = DIST_DIR / item.name
+        if item.is_dir():
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(item, dst)
+        else:
+            shutil.copy2(item, dst)
+
+    src_exe = DIST_DIR / CSHARP_EXE_NAME
+    if src_exe.exists():
+        print(f"  [OK] WinUI 3 → dist/{EXE_NAME}/{CSHARP_EXE_NAME}")
+        # Прибираємо стару папку settings/ якщо лишилась від попереднього білду
+        old_settings = DIST_DIR / "settings"
+        if old_settings.exists():
+            shutil.rmtree(old_settings)
+    else:
+        print(f"  [УВАГА] {CSHARP_EXE_NAME} не знайдено в {DIST_DIR}")
+        return False
+
     return True
 
 
@@ -317,9 +326,9 @@ def main():
     print("\n" + "=" * 60)
     print("  ГОТОВО!")
     print(f"  Папка: dist/{EXE_NAME}/")
-    print(f"  Асистент:    dist/{EXE_NAME}/{EXE_NAME}.exe")
+    print(f"  Асистент:     dist/{EXE_NAME}/{EXE_NAME}.exe")
     print(f"  Налаштування: dist/{EXE_NAME}/{CSHARP_EXE_NAME}")
-    print(f"  Конфіг:      dist/{EXE_NAME}/config.json")
+    print(f"  Конфіг:       dist/{EXE_NAME}/config.json")
     print("=" * 60)
 
 

@@ -36,7 +36,7 @@ class CalendarPlugin(SmartPlugin):
 
     @property
     def name(self) -> str:
-        return "calendar_manager"
+        return "calendar_reader"
 
     @property
     def description(self) -> str:

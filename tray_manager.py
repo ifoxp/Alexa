@@ -36,9 +36,10 @@ class TrayManager:
         print("Запуск налаштувань...")
         try:
             base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else "."
-            settings_exe_path = os.path.join(base_path, "AlexaSettings.exe")
+            settings_exe_path = os.path.join(base_path, "AlexaSettingsWinUI.exe")
             if os.path.exists(settings_exe_path):
-                os.startfile(settings_exe_path)
+                import subprocess
+                subprocess.Popen([settings_exe_path], cwd=base_path)
             else:
                 print(f"❌ Не знайдено файл налаштувань: {settings_exe_path}")
         except Exception as e:

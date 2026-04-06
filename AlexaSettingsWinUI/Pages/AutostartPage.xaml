@@ -1,0 +1,52 @@
+<Page
+    x:Class="AlexaSettingsWinUI.Pages.AutostartPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <StackPanel Grid.Row="0" Padding="32,24,32,16">
+            <TextBlock Text="Автозапуск" Style="{StaticResource TitleTextBlockStyle}"/>
+            <TextBlock Text="Запускати Alexa автоматично разом з Windows"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Padding="32,0,32,32" Spacing="8" MaxWidth="780">
+
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="16" Padding="20,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Запуск з Windows" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                            <TextBlock x:Name="AlexaPathLabel"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       Margin="0,4,0,0" TextWrapping="WrapWholeWords"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Name="TglAutostart" Grid.Column="1"
+                                      OnContent="Увімк." OffContent="Вимк."
+                                      Margin="16,-8,0,0"
+                                      Toggled="TglAutostart_Toggled"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
+                     Title="Примітка"
+                     Message="Alexa.exe має знаходитись поряд або в dist/Alexa/ відносно цього файлу."/>
+
+        </StackPanel>
+    </Grid>
+</Page>

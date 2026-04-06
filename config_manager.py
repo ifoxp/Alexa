@@ -39,7 +39,10 @@ def load_config():
         raise ValueError(f"AccessKey відсутній або не встановлений у {CONFIG_FILE}.")
 
     # Зберігаємо оновлений конфіг (якщо у файлі бракувало якихось полів)
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+    except PermissionError:
+        print(f"⚠️ Не вдалося оновити {CONFIG_FILE} (немає прав на запис). Продовжуємо з поточними налаштуваннями.")
 
     return config

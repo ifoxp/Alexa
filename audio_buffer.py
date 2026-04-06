@@ -124,29 +124,39 @@ class BufferedAudioStream:
 
     def _buffer_loop(self):
         """Головний цикл читання з потоку в буфер."""
-        # Видаляємо debug лог loop started
+        import struct
+        import traceback
+        _last_err = None
+        _err_count = 0
 
         while self.is_running:
             try:
                 if self.stream.is_active():
-                    # Читаємо невеликими блоками для зменшення latency
                     chunk_size = 512
                     audio_data = self.stream.read(chunk_size, exception_on_overflow=False)
-
-                    # Конвертуємо bytes в int16
-                    import struct
+                    # Захист від неповного блоку (розмір має бути chunk_size * 2 bytes)
+                    expected_bytes = chunk_size * 2
+                    if len(audio_data) < expected_bytes:
+                        time.sleep(0.01)
+                        continue
                     samples = struct.unpack(f"<{chunk_size}h", audio_data)
-
-                    # Додаємо в буфер
                     self.buffer.write(samples)
+                    # Скидаємо лічильник помилок після успіху
+                    if _err_count > 0:
+                        logger.info(f"Audio buffer recovered after {_err_count} errors")
+                        _err_count = 0
+                        _last_err = None
                 else:
                     time.sleep(0.01)
 
             except Exception as e:
-                logger.error("Audio buffer loop error", extra={'error': str(e)})
+                err_str = str(e)
+                _err_count += 1
+                # Логуємо лише першу появу помилки і потім кожні 50 разів
+                if err_str != _last_err or _err_count % 50 == 0:
+                    logger.error(f"Audio buffer loop error (x{_err_count}): {err_str}")
+                    _last_err = err_str
                 time.sleep(0.1)
-
-        # Видаляємо debug лог loop stopped
 
     def read_frame(self, frame_size, timeout=1.0):
         """Читає кадр з буфера."""

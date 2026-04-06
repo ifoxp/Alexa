@@ -191,7 +191,6 @@ def main():
                         # --- ЗАПУСК КАЛЕНДАРЯ (БРИФІНГ ТА ФОНОВИЙ МОНІТОРИНГ) ---
                         calendar_plugin = smart_ai.smart_assistant.plugin_manager.plugins.get("calendar_manager")
                         if calendar_plugin:
-                            import threading
                             import asyncio
                             
                             def start_calendar_loop():

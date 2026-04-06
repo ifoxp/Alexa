@@ -1,0 +1,119 @@
+<Page
+    x:Class="AlexaSettingsWinUI.Pages.GeneralPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <StackPanel Grid.Row="0" Padding="32,24,32,16">
+            <TextBlock Text="Загальні налаштування" Style="{StaticResource TitleTextBlockStyle}"/>
+            <TextBlock Text="API ключі, wake word та мови розпізнавання"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" Padding="32,0,32,8">
+            <StackPanel Spacing="8" MaxWidth="780">
+
+                <!-- API ключі -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="16" Padding="20,16">
+                        <TextBlock Text="API ключі" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                        <InfoBar x:Name="ConfigPathBar" IsOpen="True" IsClosable="False"
+                                 Severity="Informational" Title="config.json" Message=""/>
+                        <PasswordBox x:Name="TxtPicovoiceKey"
+                                     Header="Picovoice Access Key"
+                                     PlaceholderText="Вставте ключ з console.picovoice.ai"/>
+                        <PasswordBox x:Name="TxtOpenAiKey"
+                                     Header="OpenAI / Gemini API Key"
+                                     PlaceholderText="sk-... або AIza..."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Wake Word -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="16" Padding="20,16">
+                        <TextBlock Text="Wake Word" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="24">
+                            <RadioButton x:Name="RbStandard" Content="Стандартний (Picovoice)"
+                                         GroupName="WakeWordMode" Checked="WakeWordMode_Changed"/>
+                            <RadioButton x:Name="RbCustom" Content="Власний .ppn файл"
+                                         GroupName="WakeWordMode" Checked="WakeWordMode_Changed"/>
+                        </StackPanel>
+                        <ComboBox x:Name="CmbWakeWord" Header="Модель" HorizontalAlignment="Stretch">
+                            <ComboBoxItem Content="alexa"     Tag="alexa"/>
+                            <ComboBoxItem Content="jarvis"    Tag="jarvis"/>
+                            <ComboBoxItem Content="hey siri"  Tag="hey siri"/>
+                            <ComboBoxItem Content="ok google" Tag="ok google"/>
+                            <ComboBoxItem Content="porcupine" Tag="porcupine"/>
+                        </ComboBox>
+                        <Grid x:Name="CustomWakeWordGrid" Visibility="Collapsed" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtCustomPath" Header="Шлях до .ppn файлу"
+                                     PlaceholderText="C:\...\custom.ppn"/>
+                            <Button Content="Огляд" Grid.Column="1" VerticalAlignment="Bottom"
+                                    Click="BtnBrowse_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Чутливість -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="12" Padding="20,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Чутливість розпізнавання"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtSensitivityVal" Text="0.50"
+                                       Grid.Column="1" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                        </Grid>
+                        <Slider x:Name="SliderSensitivity" Minimum="0" Maximum="100"
+                                ValueChanged="SliderSensitivity_ValueChanged"/>
+                        <TextBlock Text="Низька чутливість — менше хибних спрацювань. Висока — швидше реагує."
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Мови -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel Spacing="12" Padding="20,16">
+                        <TextBlock Text="Мови розпізнавання" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                        <TextBlock Text="Оберіть одну або кілька мов для STT"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <StackPanel x:Name="PnlLanguages" Spacing="8"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Padding="32,12"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+            <Button x:Name="BtnSave" Content="Зберегти"
+                    Style="{StaticResource AccentButtonStyle}"
+                    HorizontalAlignment="Right"
+                    Click="BtnSave_Click"/>
+        </Border>
+    </Grid>
+</Page>

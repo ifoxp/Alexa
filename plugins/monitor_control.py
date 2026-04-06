@@ -31,7 +31,7 @@ class MonitorControlPlugin(SmartPlugin):
     @property
     def commands(self) -> Dict[str, str]:
         return {
-            "set_brightness": "встановити яскравість. Значення — масив [номер, відсоток]. Якщо моніторів КІЛЬКА з РІЗНОЮ яскравістю, передавай масив масивів. Приклади: {'set_brightness': [2, 30]} (один), {'set_brightness': [[1, 55], [2, 30]]} (кілька), або {'set_brightness': ['all', 50]} (всі).",
+            "set_brightness": "встановити яскравість. Значення — масив [номер, відсоток]. Якщо моніторів КІЛЬКА з РІЗНОЮ яскравістю, передавай масив масивів. Приклади: {'set_brightness': [2, 30]} (один), {'set_brightness': [[1, 55], [2, 30]]} (кілька), {'set_brightness': ['all', 50]} (всі) АБО якщо всі — передавай value='all' та level=відсоток.",
             "turn_off_monitor": "вимкнути монітор. Значення — номер монітора. Приклад: {'turn_off_monitor': 2}",
             "turn_on_monitor": "увімкнути монітор. Значення — номер монітора. Приклад: {'turn_on_monitor': 1}"
         }
@@ -99,6 +99,17 @@ class MonitorControlPlugin(SmartPlugin):
                     command_value = level_field
 
                 print(f"[MONITOR] set_brightness raw value: {command_value}")
+
+                # Обробка рядка 'all' — встановити яскравість всіх моніторів
+                if str(command_value).lower() == "all" and level_field:
+                    level = int(level_field)
+                    print(f"[MONITOR] set brightness ALL monitors (str 'all') -> {level}%")
+                    for i in range(len(available_monitors)):
+                        try:
+                            sbc.set_brightness(level, display=i, method='vcp')
+                        except Exception:
+                            sbc.set_brightness(level, display=i)
+                    return {"success": True, "result": None, "message": f"Яскравість всіх дисплеїв встановлено на {level}%"}
 
                 if isinstance(command_value, str):
                     try:
