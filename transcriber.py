@@ -3,6 +3,9 @@ import settings
 import asyncio
 import concurrent.futures
 import threading
+import struct
+import math
+import pyaudio
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from logger_config import get_logger
 import os
@@ -55,11 +58,9 @@ class OnlineTranscriber:
             # Зменшуємо базовий поріг, щоб краще чути тихий голос
             self.recognizer.energy_threshold = 250 
             
-            # Збільшуємо час паузи, щоб ти міг робити перерви між словами
-            self.recognizer.pause_threshold = 2.0
+            self.recognizer.pause_threshold = 0.8
             self.recognizer.phrase_threshold = 0.1
-            # Збільшено щоб захоплювався "хвіст" після останнього слова
-            self.recognizer.non_speaking_duration = 1.0
+            self.recognizer.non_speaking_duration = 0.5
             logger.info("Microphone calibration completed with optimized settings")
 
     def set_language(self, lang_code):
@@ -150,28 +151,115 @@ class OnlineTranscriber:
 
         return result
 
-    def listen_and_get_audio(self, timeout):
-        """Слухає одну фразу і повертає WAV байти (без STT). Для Gemini Native Audio."""
+    def listen_and_get_audio(self, timeout,
+                              pause_threshold: float = 0.8,
+                              speech_start_timeout: float = 8.0,
+                              min_speech_duration: float = 0.3):
+        """Слухає одну фразу з власним VAD і повертає WAV байти для Gemini Native Audio.
+
+        Зупиняється як тільки виявляє тишу тривалістю pause_threshold після початку мови.
+        speech_start_timeout — скільки чекати початку мови (не більше timeout).
+        min_speech_duration — мінімальна тривалість мови щоб не повертати сміття.
+        """
         if not timeout or timeout <= 0:
             return None
 
         import speed_logger
+        import wave
+        import io
         timer = speed_logger.get_session()
         if timer:
             timer.on_listen_start()
 
-        with self.microphone as source:
-            try:
-                print(f" M... (очікую до {timeout:.1f}с)")
-                audio = self.recognizer.listen(
-                    source,
-                    timeout=timeout,
-                    phrase_time_limit=20,
-                )
-            except sr.WaitTimeoutError:
-                return None
+        rate = settings.RATE
+        chunk = settings.CHUNK
+        fmt = pyaudio.paInt16
+        channels = 1
 
-        wav = audio.get_wav_data()
+        # Поріг RMS для детекції мови — беремо з recognizer (він вже скалібрований)
+        energy_threshold = max(self.recognizer.energy_threshold, 150)
+
+        pa = pyaudio.PyAudio()
+
+        # Знаходимо device_index через мікрофон speech_recognition
+        device_index = self.microphone.device_index
+
+        sample_width = pa.get_sample_size(fmt)
+
+        try:
+            stream = pa.open(
+                format=fmt,
+                channels=channels,
+                rate=rate,
+                input=True,
+                input_device_index=device_index,
+                frames_per_buffer=chunk,
+            )
+        except Exception as e:
+            pa.terminate()
+            logger.error(f"VAD: не вдалось відкрити мікрофон: {e}")
+            return None
+
+        chunks_per_second = rate / chunk  # ~31 чанків/с при rate=16000, chunk=512
+        pause_chunks = int(pause_threshold * chunks_per_second)
+        start_timeout_chunks = int(min(speech_start_timeout, timeout) * chunks_per_second)
+        max_chunks = int(timeout * chunks_per_second)
+
+        frames = []
+        speech_started = False
+        silence_count = 0
+        total_chunks = 0
+        speech_chunks = 0
+
+        print(f" M... (VAD, очікую до {timeout:.1f}с, поріг={energy_threshold:.0f})")
+
+        try:
+            while total_chunks < max_chunks:
+                data = stream.read(chunk, exception_on_overflow=False)
+                total_chunks += 1
+
+                # RMS енергія чанку
+                shorts = struct.unpack(f"{len(data) // 2}h", data)
+                rms = math.sqrt(sum(s * s for s in shorts) / len(shorts)) if shorts else 0
+
+                is_speech = rms > energy_threshold
+
+                if is_speech:
+                    if not speech_started:
+                        speech_started = True
+                        print(f" [VAD] Мова виявлена (RMS={rms:.0f})")
+                    silence_count = 0
+                    frames.append(data)
+                    speech_chunks += 1
+                elif speech_started:
+                    # Тиша після початку мови
+                    silence_count += 1
+                    frames.append(data)  # захоплюємо "хвіст"
+                    if silence_count >= pause_chunks:
+                        print(f" [VAD] Тиша {pause_threshold}s — зупиняємо запис")
+                        break
+                else:
+                    # Тиша до початку мови
+                    if total_chunks >= start_timeout_chunks:
+                        print(f" [VAD] Мова не виявлена за {speech_start_timeout:.0f}с — таймаут")
+                        break
+        finally:
+            stream.stop_stream()
+            stream.close()
+            pa.terminate()
+
+        if not speech_started or speech_chunks < int(min_speech_duration * chunks_per_second):
+            return None
+
+        # Збираємо WAV в пам'яті
+        buf = io.BytesIO()
+        with wave.open(buf, 'wb') as wf:
+            wf.setnchannels(channels)
+            wf.setsampwidth(sample_width)
+            wf.setframerate(rate)
+            wf.writeframes(b"".join(frames))
+        wav = buf.getvalue()
+
         if timer:
             timer.on_audio_ready(len(wav))
         return wav
