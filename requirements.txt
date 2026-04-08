@@ -12,6 +12,8 @@ openai
 
 # System monitoring
 psutil
+nvidia-ml-py
+GPUtil
 
 # Audio I/O & Data
 pyaudio
@@ -26,6 +28,7 @@ edge-tts
 pycaw
 pywin32
 keyboard
+uiautomation
 
 # System Tray integration
 pystray

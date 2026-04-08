@@ -491,9 +491,13 @@ async def process_smart_command(user_text: str) -> dict:
             smart_assistant.update_conversation_context(user_text, quick_response, selected_plugins)
 
             for result in successful_commands:
-                if "speak_text" in result.get("result", {}):
-                    if _timer: _timer.on_tts_start(result["result"]["speak_text"])
-                    await asyncio.to_thread(speak_text, result["result"]["speak_text"], config)
+                follow_up = (
+                    result.get("result", {}).get("speak_text")
+                    or result.get("result", {}).get("message")
+                )
+                if follow_up:
+                    if _timer: _timer.on_tts_start(follow_up)
+                    await asyncio.to_thread(speak_text, follow_up, config)
                     if _timer: _timer.on_tts_done()
                     break
         else:
@@ -609,9 +613,13 @@ async def process_smart_command_audio(audio_bytes: bytes) -> dict:
         if successful_commands:
             smart_assistant.update_conversation_context(transcript or "[audio]", quick_response, selected_plugins)
             for result in successful_commands:
-                if "speak_text" in result.get("result", {}):
-                    if _timer: _timer.on_tts_start(result["result"]["speak_text"])
-                    await asyncio.to_thread(speak_text, result["result"]["speak_text"], config)
+                follow_up = (
+                    result.get("result", {}).get("speak_text")
+                    or result.get("result", {}).get("message")
+                )
+                if follow_up:
+                    if _timer: _timer.on_tts_start(follow_up)
+                    await asyncio.to_thread(speak_text, follow_up, config)
                     if _timer: _timer.on_tts_done()
                     break
         else:

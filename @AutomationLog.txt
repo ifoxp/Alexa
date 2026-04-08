@@ -1,0 +1,2 @@
+2026-04-06 15:57:23.574 window_manager.py[158] _get_browser_tabs -> Find Control Timeout(10s): {ControlType: TabControl}
+2026-04-06 15:58:02.105 window_manager.py[158] _get_browser_tabs -> Find Control Timeout(10s): {ControlType: TabControl}
