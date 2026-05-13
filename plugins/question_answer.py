@@ -3,7 +3,7 @@ from .base_plugin import SmartPlugin
 
 
 class QuestionAnswerPlugin(SmartPlugin):
-    """Плагін для відповідей на будь-які запитання користувача голосом."""
+    """Плагін для відповідей на будь-які запитання користувача голосом. ЯКІ НЕ ОБОВ'ЯЗКОВО гуглити відкриваючи браузер."""
 
     @property
     def name(self) -> str:

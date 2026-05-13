@@ -7,7 +7,7 @@ from .base_plugin import SmartPlugin
 
 
 class BrowserSearchPlugin(SmartPlugin):
-    """Плагін для пошуку в браузері: Google, YouTube (пошук або пряме відтворення першого відео)."""
+    """Плагін для пошуку в браузері: Google, YouTube (пошук або пряме відтворення першого відео). Тільки при запиті на пошук: знайди, пошукай і подібне по контексту."""
 
     @property
     def name(self) -> str:
