@@ -14,6 +14,7 @@ from audio_buffer import BufferedAudioStream
 from memory_manager import memory_manager, ResourceManager, log_memory_usage
 import smart_ai
 from media_controller import media_manager
+from hotkey_manager import start_hotkey_listener, set_tray as hotkey_set_tray
 
 logger = get_logger('main')
 
@@ -316,6 +317,10 @@ def main():
             # Запускаємо watchdog відновлення гучності
             media_manager.start_watchdog()
 
+            # Реєструємо глобальні хоткеї (Page Up → task_solver)
+            hotkey_set_tray(tray)
+            start_hotkey_listener()
+
             logger.info("Assistant started successfully")
             tray.start()
 
@@ -338,4 +343,13 @@ def main():
             logger.info("Program terminated successfully")
 
 if __name__ == "__main__":
-    main()
+    import ctypes
+    _mutex = ctypes.windll.kernel32.CreateMutexW(None, True, "Global\\AlexaAssistantMutex")
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        print("Асистент вже запущений. Завершення.")
+        ctypes.windll.kernel32.CloseHandle(_mutex)
+        raise SystemExit(0)
+    try:
+        main()
+    finally:
+        ctypes.windll.kernel32.CloseHandle(_mutex)

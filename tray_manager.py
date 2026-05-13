@@ -28,6 +28,7 @@ class TrayManager:
         self.app_name = app_name
         self.icon_default = Image.open(get_asset_path("ai.png"))
         self.icon_listening = _colorize_icon(self.icon_default)
+        self.icon_thinking = _colorize_icon(self.icon_default, target_color=(255, 140, 0, 255))
         self.icon_instance = None
         self.is_running = True
 
@@ -69,6 +70,10 @@ class TrayManager:
         """Змінює іконку (біла/зелена)."""
         if self.icon_instance:
             new_icon = self.icon_listening if is_listening else self.icon_default
-            # Оновлення іконки має відбуватися у головному потоці,
-            # але pystray зазвичай сам з цим справляється
+            self.icon_instance.icon = new_icon
+
+    def set_icon_thinking(self, is_thinking):
+        """Змінює іконку на оранжеву (очікування відповіді від Gemini)."""
+        if self.icon_instance:
+            new_icon = self.icon_thinking if is_thinking else self.icon_default
             self.icon_instance.icon = new_icon

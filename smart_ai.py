@@ -438,6 +438,27 @@ def initialize_smart_assistant(api_key: str, routing_model: str = None, plugin_m
         return False
 
 
+def _refresh_plugins_if_needed():
+    """Перевіряє чи змінився disabledPlugins у config.json і перезавантажує плагіни якщо треба."""
+    from smart_plugin_manager import SmartPluginManager, _load_disabled_plugins
+    if smart_assistant.plugin_manager is None:
+        smart_assistant.plugin_manager = SmartPluginManager()
+        smart_assistant.build_gemini_tools()
+        return
+    current_disabled = _load_disabled_plugins()
+    loaded_plugins = set(smart_assistant.plugin_manager.plugins.keys())
+    if not hasattr(smart_assistant, '_all_known_plugins'):
+        smart_assistant._all_known_plugins = set(loaded_plugins)
+    else:
+        smart_assistant._all_known_plugins |= loaded_plugins
+    expected_active = smart_assistant._all_known_plugins - current_disabled
+    if expected_active != loaded_plugins:
+        logger.info(f"disabledPlugins змінився — перезавантажую плагіни. Було: {loaded_plugins}, очікується: {expected_active}")
+        smart_assistant.plugin_manager = SmartPluginManager()
+        smart_assistant._all_known_plugins = set(smart_assistant.plugin_manager.plugins.keys()) | current_disabled
+        smart_assistant.build_gemini_tools()
+
+
 async def process_smart_command(user_text: str) -> dict:
     """Основна функція для обробки команд через ШІ."""
     global_start_time = time.time()
@@ -449,9 +470,7 @@ async def process_smart_command(user_text: str) -> dict:
     try:
         from smart_plugin_manager import SmartPluginManager
 
-        if smart_assistant.plugin_manager is None:
-            smart_assistant.plugin_manager = SmartPluginManager()
-            smart_assistant.build_gemini_tools()
+        _refresh_plugins_if_needed()
 
         try:
             import config_manager as cfg
@@ -572,9 +591,7 @@ async def process_smart_command_audio(audio_bytes: bytes) -> dict:
     try:
         from smart_plugin_manager import SmartPluginManager
 
-        if smart_assistant.plugin_manager is None:
-            smart_assistant.plugin_manager = SmartPluginManager()
-            smart_assistant.build_gemini_tools()
+        _refresh_plugins_if_needed()
 
         try:
             import config_manager as cfg
