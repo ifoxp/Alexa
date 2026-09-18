@@ -1,3 +1,5 @@
+**English** · [Українська](README.uk.md)
+
 # Alex
 
 A Windows voice assistant with hot-pluggable skills. Say the wake word, ask for
@@ -100,3 +102,9 @@ pip install -r requirements.txt
 python main.py          # run from source
 python build.py         # package with PyInstaller
 ```
+
+---
+
+**Chekaliuk Dmytro** · [@ifoxp](https://github.com/ifoxp) ·
+[ifoxp.top](https://ifoxp.top) · Telegram [@ifoxp](https://t.me/ifoxp) ·
+Discord `ifoxp`
